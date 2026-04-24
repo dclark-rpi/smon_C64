@@ -1,0 +1,56 @@
+Neues vom SMON
+
+Diese Erweiterung stellt elf weitere Befehle zur Verfügung. So läßt sich der
+Monitor zum Beispiel frei im Speicher verschieben und Sprites oder Zeichensätze 
+können sehr einfach erstellt und geändert werden.
+
+Um die Befehlserweiterung zu initialisieren, geht man folgen-dermaßen vor:
+1. SMON absolut laden.
+2. Den Basic-Lader (siehe Listing) eintippen und abspeichern.
+3. Nach dem Start des Laders die Startadresse (dezimal) Ihrer SMON-Version eingeben:
+zum Beispiel 49152 (= $COOO).
+4. Den erweiterten SMON zum Beispiel mit "SMONEX" Startadresse Endadresse abspeichern. 
+Die neuen Routinen werden, genau wie die meisten bereits vorhandenen, durch einen Buchstaben, zum Teil gefolgt von Adressenangaben, aufgerufen. Bei den ersten drei Ausgabe-befehlen kann der Speicherinhalt durch Überschreiben der Zeile geändert werden.
+
+Z 4000 (4100) (Zeichendaten) 
+gibt den Speicherinhalt von $4000 (bis $40FF) folgender-maßen aus: Jeweils ein Byte pro Zeile wird in 8-Bit-Form dargestellt. Dabei ist ein »*« ein gesetztes, ein ».« dagegen ein nicht gesetztes Bit. Die beiden Zeichen sind willkürlich gewählt und können durch Überschreiben der Speicherzellen $xE65, $xE2D (Bit = 1) und $xE69, 
+$xE30 (Bit = 0) in den Bildschirm-Code (!) der gewünschten Zeichen geändert werden.
+
+Die Anwendung dieses Befehls liegt beispielsweise in der gezielten und anschaulichen Beeinflussung bestimmter 
+Steuerbits in VIC, CIA, etc. Andererseits lassen sich-besonders in Verbindung mit dem Kommando »Q« - Zeichendaten leicht modifizieren.
+
+H 4000 (4100) 
+entspricht dem Befehl »Z« mit dem Unterschied, daß jeweils drei Byte pro Zeile ausgegeben werden. Das entspricht dem Format für Spritedaten. Auf diese Weise steht mit dem erwei-terten SMON ein kleiner »Sprite-Editor« zur Verfügung.
+
+N 4000 (4100) (Normaldarstellung)
+interpretiert den Speicherinhalt von $4000 (bis $40FF) als Bildschirm-Code und gibt 32 Zeichen pro Zeile aus.
+
+U 4000 (4100) (Übersicht)
+Wie »N«, jedoch werden in einer Zeile 40 Zeichen darge-stellt. Änderungen sind nur mit »N« möglich. Dieser Befehl
+dient hauptsächlich dazu, im Speicher abgelegte Bildschirm-informationen so auszugeben, wie sie tatsächlich im
+40-Zeichen/Zeile-Format aussehen würden. Dieser Befehl ist recht nützlich, um professionelle Videospiele zu analysieren, da hier Spielszenen oft im Bildschirm-Code gespeichert sind.
+
+E 4000 (4100) (Erase)
+ist der bereits in 64'er Ausgabe 2/85 vorgeschlagene Erase-Befehl zum Füllen des Speicherbereiches von $4000
+bis $40FF mit $00.
+
+Y 40
+kopiert die vorhandene SMON-Version in nur drei Sekunden nach $4000 bis $4FFF und nimmt dabei alle notwendigen 
+An-passungen vor. Die ursprüngliche Speicherversion des Monitors bleibt unverändert. Mit »G 4000 « kann man in den neuen SMON springen. Von dem Byte-Wert, der übergeben werden muß, wird nur das obere Nibble ($4) gewertet, so daß sich theoretisch 16 SMON-Versionen im Speicher unterbringen lassen, wobei natürlich nicht alle Möglichkeiten sinnvoll sind.
+Auf diese Weise läßt sich stets die erforderliche Speicher-version herstellen, ohne daß langwierige Änderungen notwen-dig sind.
+
+Q 2000
+kopiert den Zeichensatz aus dem ROM von $D000 bis
+$DFFF in das RAM nach $2000. Dort kann er mit dem Befehl »Z« nach Belieben geändert werden. Möchte man zum 
+Beispiel das Zeichen »A« in ein »Ä« umdefinieren, so ist der Zeichensatz mit »Q 2000« ins RAM zu kopieren. Anschließend kann mit »Z 2000 2015« der Bereich in binärer Form auf dem Bildschirm ausgegeben werden, in dem auch das Zeichen »A« steht. Dieses kann nun (siehe Bild) in ein »Ä« geändert werden, indem man mit dem Cursor an die zu ändernde Stelle fährt und für einen Punkt, der gesetzt werden soll, ein »*« «und für einen Punkt der nicht gesetzt werden soll ein ».« setzt. So, jetzt ist der Zeichensatz umdefiniert, aber noch nicht aktiviert. Als nächstes muß dem Videocontroller die Startadrese des neuen Zeichensatzes mitgeteilt werden. Dazu ist die Adresse $D018, in der eine hexadezimale 15 steht, durch eine hexadezimale 18 zu ersetzen.
+
+J
+bringt den letzten Ausgabebefehl (K, D, M, Z, H, N, U) auf den Bildschirm zurück. Mit RETURN wird der letzte Befehl
+noch einmal ausgeführt.
+Zum Schluß noch ein Tip:
+DATA-Zeilen in Hex-Byte-Darstellung sind wegen ihrer konstanten Länge (immer zwei Ziffern pro Wert!) übersichtlicher als solche mit dezimalen Zahlen. Da für die Ausgabe von Hex-Werten bereits alle Routinen im SMON integriert sind, kann der »B«-Befehl (Basic-DATA-Zeilen erzeugen) durch Verändern eines einzigen Sprungbefehles dahingehend manipuliert werden, daß der Speicherinhalt künftig in Form von Hex-Byte ausgegeben wird:
+Disassemblieren Sie dazu den Byte-Ausgabebefehl mit »Dx99F« und ersetzen »JSR BDD1« durch »JSR x32A«. Für das
+»x« muß der 4-KByte-Block, in dem die zu ändernde SMON-Version steht, eingesetzt werden. Liegt Ihre SMON-Version
+bei $COOO, so ersetzen Sie das »x« durch ein »C«.
+Die Gesamtlänge der DATA-Zeile kann außerdem durch Verändern der Speicherzelle $x9AE variiert werden. Bei dem
+Wert $1C werden zum Belspiel genau acht Hex-Byte pro Zeile ausgegeben. (Mark Richters/ah)

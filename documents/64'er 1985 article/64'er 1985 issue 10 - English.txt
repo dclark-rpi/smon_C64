@@ -1,0 +1,53 @@
+News from SMON
+
+This extension provides eleven additional commands. For example, the monitor can be freely moved in memory, and sprites or character sets can be created and modified very easily.
+
+To initialize the command extension, proceed as follows:
+
+1. Load SMON absolutely.
+2. Type in the basic loader (see listing) and save it.
+3. After starting the loader, enter the starting address (decimal) of your SMON version:
+for example, 49152 (= $COOO).
+4. Save the extended SMON, for example, with "SMONEX" start address end address.
+
+The new routines, just like most of the existing ones, are called by a letter, sometimes followed by address specifications. For the first three output commands, the memory contents can be changed by overwriting the line.
+
+Z 4000 (4100) (character data)
+outputs the memory contents of $4000 (up to $40FF) as follows: One byte per line is represented in 8-bit form. A "*" is a set bit, while a "." is an unset bit. The two characters are arbitrarily chosen and can be changed to the screen code (!) of the desired characters by overwriting the memory locations $xE65, $xE2D (bit = 1) and $xE69, $xE30 (bit = 0).
+
+The application of this command lies, for example, in the targeted and visual manipulation of specific control bits in VIC, CIA, etc. Furthermore, character data can be easily modified, especially in conjunction with the "Q" command.
+
+H 4000 (4100)
+corresponds to the "Z" command, except that three bytes are output per line. This corresponds to the format for sprite data. In this way, the extended SMON provides a small "sprite editor."
+
+N 4000 (4100) (normal display)
+interprets the memory contents of $4000 (up to $40FF) as screen code and outputs 32 characters per line.
+
+U 4000 (4100) (Overview)
+
+Like "N", but 40 characters are displayed per line. Changes are only possible with "N". This command
+is primarily used to output screen information stored in memory as it would actually appear in the
+40-character/line format. This command is quite useful for analyzing professional video games, as game scenes are often stored in screen code.
+
+E 4000 (4100) (Erase)
+is the erase command, already proposed in issue 2/85 of 64'er, for filling the memory range from $4000
+to $40FF with $00.
+
+Y 40
+copies the existing SMON version to $4000 to $4FFF in just three seconds, making all necessary adjustments. The monitor's original memory version remains unchanged. "G 4000" allows you to jump to the new SMON. Of the byte value that must be passed, only the upper nibble ($4) is evaluated, so theoretically 16 SMON versions can be stored in memory, although of course not all possibilities are practical.
+In this way, the required memory version can always be created without the need for lengthy modifications.
+
+Q 2000
+copies the character set from ROM from $D000 to $DFFF into RAM at $2000. There, it can be modified as desired using the command "Z". For example, to redefine the character "A" to "Ä", the character set must be copied into RAM using "Q 2000". Then, the range containing the character "A" can be displayed on the screen in binary form using "Z 2000 2015". This can now be changed to "Ä" (see image) by moving the cursor to the desired position and using "*" for a dot to be added and "." for a dot not to be added. The character set is now redefined, but not yet activated. Next, the video controller must be informed of the starting address of the new character set. To do this, replace the address $D018, which contains a hexadecimal 15, with a hexadecimal 18.
+
+J
+returns the last output instruction (K, D, M, Z, H, N, U) to the screen. Pressing RETURN executes the last instruction
+again.
+
+Finally, a tip:
+Data lines in hexadecimal byte representation are clearer than those with decimal numbers because of their constant length (always two digits per value!). Since all the routines for outputting hexadecimal values ​​are already integrated into SMON, the "B" instruction (create basic data lines) can be modified by changing a single jump instruction so that the memory contents are output in hexadecimal bytes:
+To do this, disassemble the byte output instruction with "Dx99F" and replace "JSR BDD1" with "JSR x32A". For the
+"x", the 4 KB block containing the SMON version to be changed must be used. If your SMON version is located at $COOO, replace the "x" with a "C".
+
+The total length of the DATA line can also be varied by changing the memory location $x9AE. For example, with the
+value $1C, exactly eight hexadecimal bytes are output per line. (Mark Richters/ah)
