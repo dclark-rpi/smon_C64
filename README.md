@@ -1,8 +1,7 @@
 # SMON
 
-Modified to run on the [RP6502 Picocomputer](https://github.com/picocomputer/rp6502)
+Modified to run on the Commodore 64 again
 
-This repo modifies the original by adding RIA support instead of a UART.
 Also the location of the jump table is labelled and used so as not to create a larger binary.
 
 The rest is pretty much the same....
@@ -63,7 +62,7 @@ in the `config.asm` file (see below).
 At startup, SMON shows the current 6502 processor status, followed by a "." command prompt
 ```
   PC  SR AC XR YR SP  NV-BDIZC
-;E00E B4 E9 00 FF FF  10110100
+;800B B0 88 00 00 F6  10110100
 .                             
 ```
 Where "PC" is the program counter, "SR" is the status register, "AC" is the accumulator, "XR" and "YR" are
@@ -256,6 +255,28 @@ $ python3 build.py
 ```
 
 I can confirm that the above instructions worked on Windows 10 to compile the code and to transfer to the RP6502 Picocomputer by USB Flash Drive.
+
+## Running Commodore 64 SMON
+
+Load the prg or d64 floppy image on either a real commodore 64 or vice.
+use the following command to load the floppy image,
+
+``` LOAD"*",8,1  ```
+
+it will display the following,
+
+```
+     SEARCHING FOR *
+     LOADING
+     READY
+```
+then type,
+
+```  RUN  ```
+
+after it displays READY again type the following to launch the program,
+
+```  SYS 32768  ```
 
 ## Running Commodore BASIC
 
