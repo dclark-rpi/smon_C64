@@ -39,7 +39,3 @@ UAPUTW:     RTS
 UAGET:      RTS
 UAGETW:     RTS
 
-;***********************************************************************************;
-      
-UAEXIT:     RTS                               ; Exit to BASIC or return to SMON if no underlying OS
-

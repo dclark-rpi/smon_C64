@@ -109,7 +109,7 @@ COLON       := $3A                            ; colon                 :
 SEMI        := $3B                            ; semicolon             ;
 QUEST       := $3F                            ; question mark         ?
 
-            .org    $8000                     ; on c64 gives 8k ram to store program
+            .org    $8000                     ; on C64 gives 8k ram to store program
 
 ;            jsr     RESET                     ; kernel reset vector, resets processor registers 
                                               ; and clears line buffer
@@ -119,7 +119,6 @@ ENTRY:      lda     #<BREAK                   ; set break-vector to program star
             lda     #>BREAK
             sta     BRK_HI
             brk
-            nop
 
 ;; help message
 HLPMSG:     .byte   "A xxxx - Assemble starting at x (end assembly with 'f', use Mdd for label)",0
@@ -2128,7 +2127,7 @@ LCDF2:      lda     IRQ_LO
 
 ;; EXIT SMON (X)        
 EXIT:       jsr     RETURN                    ; output ASCII carriage return (CR)
-            jmp     UAEXIT                    ; exit subroutine in seperate chipset asm file
+            jmp     WARMSTART                 ; exit to BASIC or return to SMON if no underlying
 
 
 ;; print 16-bit integer in $A2/$A3 as decimal value, adapted from:
@@ -2203,6 +2202,7 @@ NUMCOLS     := 80                             ; number of columns per row
 NUMROWS     := 24                             ; number of rows
 INPUT_UCASE := 0                              ; do not automatically convert input to uppercase
 SUPPRESS_NP := 0                              ; do not suppress any characters on output
+WARMSTART   := $A474                          ; Restart BASIC
         
 ;;; ----------------------------------------------------------------------------
 ;;; ----------------------  C64 KERNAL zero page address   ---------------------
@@ -2252,35 +2252,35 @@ LASTPRNT    := $D7           ; last character printed to screen
 ;;; ----------------------------------------------------------------------------
 
         ;; re-print the current line
-PRLINE:     LDA     #13                       ; print CR
-            JSR     UAPUTW                    ; (move terminal cursor to beginning of line)
-            LDA     #0                        ; set terminal cursor position to 0
-            STA     TERMCOL                   ; fall through to print line buffer
+PRLINE:     lda     #13                       ; print CR
+            jsr     UAPUTW                    ; (move terminal cursor to beginning of line)
+            lda     #0                        ; set terminal cursor position to 0
+            sta     TERMCOL                   ; fall through to print line buffer
         
         ;; print characters in line buffer after terminal cursor position
-PREOL:      LDY     #NUMCOLS-1                ; start at end of line buffer
-PREOL0:     CPY     TERMCOL                   ; have we reached the cursor column yet?
-            BEQ     PREOL2                    ; jump if Y<=TERMCOL
-            BCC     PREOL2
-            LDA     (LINEPTR),Y               ; get character
-            DEY     
-            CMP     #$20                      ; is it SPACE?
-            BEQ     PREOL0                    ; repeat if so
-            INY                               ; remember one more than last
-            STY     TMPBUF                    ; non-space column after cursor
-            LDY     TERMCOL
-            DEY
-PREOL1:     INY
-            LDA     (LINEPTR),Y               ; get character
+PREOL:      ldy     #NUMCOLS-1                ; start at end of line buffer
+PREOL0:     cpy     TERMCOL                   ; have we reached the cursor column yet?
+            beq     PREOL2                    ; jump if Y<=TERMCOL
+            bcc     PREOL2
+            lda     (LINEPTR),Y               ; get character
+            dey     
+            cmp     #$20                      ; is it SPACE?
+            beq     PREOL0                    ; repeat if so
+            iny                               ; remember one more than last
+            sty     TMPBUF                    ; non-space column after cursor
+            ldy     TERMCOL
+            dey
+PREOL1:     iny
+            lda     (LINEPTR),Y               ; get character
             .if     SUPPRESS_NP
-              CMP     #$80                    ; ignore
-              BCS     PREOL3                  ; non-printable
-              CMP     #$20                    ; characters
-              BCS     PREOL4
-PREOL3:       LDA     #$20
+              cmp     #$80                    ; ignore
+              bcs     PREOL3                  ; non-printable
+              cmp     #$20                    ; characters
+              bcs     PREOL4
+PREOL3:       lda     #$20
 PREOL4:     .endif
-            JSR     UAPUTW                    ; output character
-            CPY     TMPBUF
-            BNE     PREOL1
-            STY     TERMCOL                   ; set new cursor position
-PREOL2:     RTS
+            jsr     UAPUTW                    ; output character
+            cpy     TMPBUF
+            bne     PREOL1
+            sty     TERMCOL                   ; set new cursor position
+PREOL2:     rts
