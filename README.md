@@ -62,7 +62,7 @@ in the `config.asm` file (see below).
 At startup, SMON shows the current 6502 processor status, followed by a "." command prompt
 ```
   PC  SR AC XR YR SP  NV-BDIZC
-;800B B0 88 00 00 F6  10110100
+;800B B0 88 00 00 F6  10110000
 .                             
 ```
 Where "PC" is the program counter, "SR" is the status register, "AC" is the accumulator, "XR" and "YR" are
