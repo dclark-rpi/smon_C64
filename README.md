@@ -1,7 +1,16 @@
 # SMON
 
+Modified to run on the [RP6502 Picocomputer](https://github.com/picocomputer/rp6502)
+
+This repo modifies the original by adding RIA support instead of a UART.
+Also the location of the jump table is labelled and used so as not to create a larger binary.
+
+The rest is pretty much the same....
+
+
+
 SMON is a machine language monitor and direct assembler for the Commodore 64,
-published in 1984 in "64'er" magazine (for more info see the [credit section](https://github.com/dhansel/smon6502#credits) below).
+published in 1984 in "64'er" magazine (for more info see the [credit section](https://github.com/dclark-rpi/smon6502#credits) below).
 
 In a nutshell, SMON provides the following functionality:
   - View and edit data in memory
@@ -15,6 +24,8 @@ In a nutshell, SMON provides the following functionality:
 The best description of SMON's commands and capabilities is the article in the
 64'er magazine (in German) [available here](https://archive.org/details/64er_sonderheft_1985_08/page/n121/mode/2up).
 For English speakers, C64Wiki has a brief [overview of SMON commands](https://www.c64-wiki.com/wiki/SMON).
+
+I've included both an English and German transcript in plain text of the original 4 part article in the Docs folder.
 
 ## SMON for 6502
 
@@ -52,7 +63,7 @@ in the `config.asm` file (see below).
 At startup, SMON shows the current 6502 processor status, followed by a "." command prompt
 ```
   PC  SR AC XR YR SP  NV-BDIZC
-;E00B B4 E7 00 FF FF  10110100
+;E00E B4 E9 00 FF FF  10110100
 .                             
 ```
 Where "PC" is the program counter, "SR" is the status register, "AC" is the accumulator, "XR" and "YR" are
@@ -71,9 +82,15 @@ The column on the right shows the (printable) ASCII characters corresponding to 
 
 If your terminal supports the VT100 cursor movement sequences, you can **modify** the memory
 content by just moving the cursor into the displayed lines, editing data and pressing ENTER
-on each line where data was modified. If your terminal does not support cursor keys you can
-modify memory by typing (for example) `:1015 AA BB` and pressing ENTER. The example here will 
-set $1015 to AA and $1016 to BB.
+on each line where data was modified. 
+
+If your terminal does not support cursor keys you can
+modify memory by typing (for example) 
+
+```
+:1015 AA BB
+```
+and pressing ENTER. The example here will set $1015 to AA and $1016 to BB.
 
 If you supply only one argument to the "m" command, SMON will show the memory content line-by-line,
 stopping after each line. Press SPACE to advance to the next line, ESC to go back to the command prompt
@@ -115,15 +132,21 @@ finishes, it should end with a `BRK` instruction.
 SMON also allows you to single-step through code using the `tw` (trace walk) command. For example:
 
 ```
+.r
+
   PC  SR AC XR YR SP  NV-BDIZC
-;2002 23 E7 00 FF FF  00100011
-.tw 2000                      
- 2002 23 E7 00 FF FF  INX     
- 2003 21 E7 01 FF FF  BNE 2002
- 2002 21 E7 01 FF FF  INX     
- 2003 21 E7 02 FF FF  BNE 2002
- 2002 21 E7 02 FF FF  INX     
- 2003 21 E7 03 FF FF  BNE 2002
+;E00E B4 E9 00 FF FF  10110100
+.tw 2000
+                      
+ 2002 23 E9 00 FF FF  00100011   INX     
+ 2003 21 E9 01 FF FF  00100001   BNE 2002
+ 2002 21 E9 01 FF FF  00100001   INX     
+ 2003 21 E9 02 FF FF  00100001   BNE 2002
+ 2002 21 E9 02 FF FF  00100001   INX     
+ 2003 21 E9 03 FF FF  00100001   BNE 2002
+
+  PC  SR AC XR YR SP  NV-BDIZC
+;2003 21 E9 03 FF FF  00100001
 ```
 
 After entering the `tw` command, SMON executes the first opcode and stops after
@@ -192,6 +215,7 @@ There are three basic settings that can be changed by modifying the `config.asm`
       The RX and TX pins can also be configured at the top of `uart_6522.asm`.
     - *Motorola MC6850*. If you choose this UART in the config.asm file you can configure it in the `uart_6850.asm` file,
       most importantly the base address (default is $8100) and the serial parameters.
+    - *RP6502 RIA*. If you choose this UART_TYPE in config.asm, make sure to change the VIA address to the following  `VIA := $FFD0` in the same file.
 
 
 ## Compiling SMON 6502
@@ -206,6 +230,33 @@ do the following:
 Then just burn the generated smon.bin file to the EEPROM using whichever programmer
 you have been using.
 
+If you are using rumbledethumps [RP6502 Picocomputer](https://picocomputer.github.io), then I have included the sdk build environment that I used that, I adapted the one provided by [Kai Wells](https://github.com/quells/wozmon.rp6502), that was used for his wozmon port.
+
+ 1. Download the `*.asm` files from this repository (there are only 7)
+  2. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
+  3. Extract `vasm6502_oldstyle.exe` from the archive and put it into the same directory as the .asm files
+  4. Make sure you have installed python 3 and the pyserial module.
+
+ ```
+$ pip install pyserial
+```
+
+  5. Finally, run `upload.py` to build and transfer the program to your Picocomputer by running the following command on the command line:
+
+```
+$ python3 upload.py
+```
+ 
+This will compile using [vasm](http://sun.hasenbraten.de/vasm/), write that out to a RP6502 ROM file, then attempt to upload to a Picocomputer attached via USB (you will need to modify the Device path of the Picocomputer serial connection in upload.py depending on your operating systems USB requirements).
+
+I have provided a cut down build.py that just compiles the source code and produces the new .rp6502 executable in the folder the command line is pointing to. To just build the program run the following:
+
+```
+$ python3 build.py
+```
+
+I can confirm that the above instructions worked on Windows 10 to compile the code and to transfer to the RP6502 Picocomputer by USB Flash Drive.
+
 ## Running Commodore BASIC
 
 After implementing the C64 kernal functions necessary to get SMON to work I realized that
@@ -217,10 +268,16 @@ Note that this is more of a toy example since only very simple BASIC programs wi
 
 ## Credits
 
-The SMON machine language monitor was originally published in three parts in the 
-[November](https://archive.org/details/64er_1984_11/page/n59/mode/2up)
-/ [December](https://archive.org/details/64er_1984_12/page/n59/mode/2up)
-/ [January](https://archive.org/details/64er_1985_01/page/n68/mode/2up)
+The SMON machine language monitor was originally published in a four part article in the following issues, 
+[November 1984](https://archive.org/details/64er_1984_11/page/n59/mode/2up)
+/ [December 1984](https://archive.org/details/64er_1984_12/page/n59/mode/2up)
+/ [January 1985](https://archive.org/details/64er_1985_01/page/n68/mode/2up) 
+/[February 1985](https://archive.org/details/64er_1985_02/page/72/mode/2up).
+
+The 64'er Magazine published "Machine Language Assembly for Beginners and Advanced Users" containing a full manual and assembler source for SMON Complete in [August 1985](https://archive.org/details/64er_sonderheft_1985_08/page/n121/mode/2up)
+
+Bug fixes for the original SMON was published in [December 1985](https://archive.org/details/64er_1985_12/page/100/mode/2up) Tricks and Tips for SMON article, which included some new additions.
+
 1984/85 issues of German magazine "[64er](https://www.c64-wiki.com/wiki/64%27er)".
 
 SMON was written for the Commodore 64 by Norfried Mann and Dietrich Weineck.
@@ -236,3 +293,7 @@ and (heavily) adapted from the VIC-20 kernal, using Lee Davidson's
 The [code](https://github.com/dhansel/smon6502/blob/main/uart_6551.asm) for handling RS232 communication via the 
 65C51N ACIA chip was put together and tested by Chris McBrien, based on the ACIA code from 
 [Adrien Kohlbecker](https://github.com/adrienkohlbecker/65C816/blob/ep.30/software/lib/acia.a).
+
+The code for the RP6502 Picocomputer port was provided by [Jim Morris](https://github.com/wolfmanjm/smon6502).
+
+The bug in the Occupy command stopping the full memory range from being changed is fixed, also the missing call to the reset kernel function was added back into the code to allow it to properly initialise the processor and clear the line buffer. All changes to Jim Morris's port to the RP6502  was provided by [David Clark](https://github.com/dclark-rpi/)

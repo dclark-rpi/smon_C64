@@ -4,7 +4,7 @@ import subprocess
 src_code = 'src/smon.asm'
 
 # Name of the vasm output file
-exe_6502 = 'smon.prg'
+bin_6502 = 'smon.prg'
 
 def compile() -> subprocess.CompletedProcess:
     compile_cmd = [
@@ -13,7 +13,7 @@ def compile() -> subprocess.CompletedProcess:
         '-cbm-prg',
         '-dotdir',
         '-c02',
-        '-o', exe_6502,
+        '-o', bin_6502,
         src_code
     ]
     cp = subprocess.run(compile_cmd)
