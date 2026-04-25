@@ -58,7 +58,11 @@ ECL         := $FE                            ; commandline argument 2 (low byte
 
 ;; Outside the zero page, SMON uses the following areas:
 
-;; Processor registers temporary storage:
+;; KERNAL variables (0200-03FF)
+COLOUR      := $0286                          ; character colour
+KBDBUF      := $0277                          ; Buffer for keyboard commands from $0277 to $0280
+
+;; Processor registers:
 PCLSAVE     := $02A8                          ; Program Counter (low byte),  little-endian
 PCHSAVE     := $02A9                          ; Program Counter (high byte), little-endian
 SRSAVE      := $02AA                          ; Processor Status Flag Register
@@ -67,13 +71,9 @@ XRSAVE      := $02AC                          ; Index Register X
 YRSAVE      := $02AD                          ; Index Register Y
 SPSAVE      := $02AE                          ; Stack Pointer
 
-KBDBUF      := $0277                          ; Buffer for keyboard commands
 IONO        := $02B0                          ; Device-Number
 MEM         := $02B1                          ; Buffer from $02B1 to $02B7
 TRACEBUF    := $02B8                          ; Buffer for trace mode from $02B8 to $02BF   
-
-INTOUT      := $BDCD                          ; Output Positive Integer in A/X
-INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
 
 IRQ_LO      := $0314                          ; Vector: Hardware IRQ Interrupt Address Lo
 IRQ_HI      := $0315                          ; Vector: Hardware IRQ Interrupt Address Hi
@@ -81,6 +81,9 @@ BRK_LO      := $0316                          ; Vector: BRK Lo
 BRK_HI      := $0317                          ; Vector: BRK Hi
 LOADVECT    := $0330                          ; Vector: Kernel LOAD
 SAVEVECT    := $0332                          ; Vector: Kernel SAVE
+
+INTOUT      := $BDCD                          ; Output Positive Integer in A/X
+INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
 
 ;; Kernal Jump Table
 JMPTABLE    := $FF81                          ; Kernal routine start address
@@ -296,10 +299,10 @@ GET3ADR:    ldx     #ADRBUF                   ; load address buffer in $A4
 ;; get start (FB/FC) and end (FD/FE) address from commandline
 ;; end address is optional, defaults to $FFFE
 GETADRSE:   jsr     GETADR                    ; get memory address from commandline
-            lda     #ECL                      
-            sta     ECH                       ; store end address (high byte)
+            lda     #ECL                      ; load low byte of end address into accumulator
+            sta     ECH                       ; store end address (high byte), big-endian
             lda     #$FF                      ; mask
-            sta     ECL                       ; store end address (low byte)
+            sta     ECL                       ; store end address (low byte), big-endian
             jsr     GETRETURN                 ; is there more commandline input?
             bne     GETADRX                   ; yes, get another memory address
             sta     KBDBUF                    ; put NUL into keyboard buffer
@@ -354,12 +357,12 @@ ASCHEX2:    and     #$0F
 SKIPSPACE:  jsr     GETCHRET                  ; get next character until a carriage return
             cmp     #SP                       ; is character byte a space " "
             beq     SKIPSPACE
-            dec     CSRCOL                    ; kernal - current cursor column pointer
+            dec     CSRCOL                    ; kernal - current cursor column pointer ($D3)
             rts
 
-;; peek whether next character on commandline is CR (Z set if so)
+;; check if next character on commandline is CR (set Z status bit if so)
 GETRETURN:  jsr     CHRIN
-            dec     CSRCOL                    ; kernal - current cursor column pointer
+            dec     CSRCOL                    ; kernal - current cursor column pointer ($D3)
             cmp     #CR                       ; is character byte a carriage return (CR)
 GETBRTS:    rts
 
@@ -374,8 +377,8 @@ UCASE1:     rts
 ;; get next character from commandline, error if CR (end of line)
 GETCHRET:   jsr     CHRIN
             jsr     UCASE
-GETCL1:     cmp     #CR                       ; is character byte a carriage return (CR)
-            bne     GETBRTS
+            cmp     #CR                       ; is character byte a carriage return (CR)
+            bne     GETBRTS                   ; branch if z=0
 
 ;; invalid input
 ERROR:      lda     #QUEST                    ; print "?"
@@ -386,7 +389,7 @@ EXECUTE:    ldx     SPSAVE                    ; restore stack pointer
             txs
             ldx     #$00                      ; clear keyboard buffer
             stx     $C6
-            lda     CSRCOL                    ; kernal - current cursor column pointer
+            lda     CSRCOL                    ; kernal - current cursor column pointer ($D3)
             beq     SKIPCR                    ; jump if zero
             jsr     RETURN                    ; output ASCII carriage return (CR)
 SKIPCR:     lda     (LINEPTR,x)               ; kernal - get first character of next line
@@ -695,44 +698,36 @@ LDBYT2:     and     #$0F
 MEMDUMP:    jsr     GETCHRET                  ; get next character until a carriage return
             beq     MEMERR                    ; error if CR
             cmp     #'T'                      ; is it 'T'
-            bne     MD1                       ; go to memory dump
-            jmp     MEMTST
-MD1:        cmp     #'S'
-            bne     MD2
-            jmp     MEMSIZ
+            bne     MD1                       ; check next condition
+            jmp     MEMTST                    ; if condition is true jump to memory test
+MD1:        cmp     #'S'                      ; is it 'S'
+            bne     MD2                       ; check next condition
+            jmp     MEMSIZ                    ; if condition is true jump to free memory check
 MD2:        cmp     #SP                       ; is character byte a space " "
-            bne     MEMERR
-MD3:        jsr     GETADRSE                  ; get start (FB/FC) and end address (FD/FE)
-MEMDUMP1:   ldx     #COLON                    ; load x register with ":"
+            bne     MEMERR                    ; error if only 'M' is found with no qualifiers
+MEMDUMP1:   jsr     GETADRSE                  ; get start (FB/FC) and end address (FD/FE)
+MEMDUMP2:   ldx     #COLON                    ; load x register with ":"
             jsr     CHARRTN                   ; New line followed by a character from x
             jsr     HEXOUT                    ; print address in FB/FC
-            ldy     #80-17
-            ldx     #0
-MEMDUMP2:   jsr     SPACE                     ; output SPACE Character
-            cpy     #80-9
-            bne     MEMDUMP3
-            jsr     SPACE                     ; output SPACE Character
-            iny
-MEMDUMP3:   lda     (PCH,x)
+            ldy     #$20
+            ldx     #$00
+MEMDUMP3:   jsr     SPACE                     ; output SPACE Character
+MEMDUMP4:   lda     (PCH,x)
             jsr     HEXOUT1                   ; output byte as HEX
             lda     (PCH,x)
-            jsr     ASCII                     ; write ASCII char of byte directly to screen
-            bne     MEMDUMP2                  ; repeat until end-of-line
-            jsr     PREOL                     ; print to end of line
+            jsr     ASCII                     ; write ASCII character byte directly to screen
+            bne     MEMDUMP3                  ; repeat until end-of-line
             jsr     CHECKEND                  ; check for PAUSE/STOP or end condition
-            bcc     MEMDUMP1                  ; repeat until end
+            bcc     MEMDUMP2                  ; repeat until end
             rts
 
 ;; EDIT MEMORY (:)
 EDITMEM:    jsr     GETADR                    ; get start address from commandline
-            ldy     #80-17
+            ldy     #$20
             ldx     #$00
-MEMCHAR:    cpy     #80-9
-            bne     NEXTCHAR
-            iny
-NEXTCHAR:   jsr     CHRIN                     ; get next character
-            cmp     #SP                       ; is next character byte a space " "
-            beq     MEMCHAR                   ; skip space
+NEXTCHAR:   jsr     CHRIN                     ; get character byte
+            cmp     #SP                       ; is character byte a space
+            beq     NEXTCHAR                  ; if true, get next character
             cmp     #CR                       ; is next character a carriage return
             beq     MEMRTS                    ; if a carriage return end
             dec     CSRCOL                    ; kernal - go back one input char
@@ -742,9 +737,7 @@ NEXTCHAR:   jsr     CHRIN                     ; get next character
             beq     SKIPERR                   ; if match then skip
 MEMERR:     jmp     ERROR                     ; print error
 SKIPERR:    jsr     ASCII                     ; write ASCII to screen
-            bne     MEMCHAR                   ; repeat until end
-            lda     #80-17
-            jsr     PRLINE
+            bne     NEXTCHAR                  ; repeat until end
 MEMRTS:     rts
 
 ;; OCCUPY (O) - erase memory with a byte of data
@@ -773,18 +766,23 @@ MEM_ZERO:   lda     #$00                      ; set accumulator value to zero
         
 ;; put character into screen buffer at column Y
 ;; (make sure it is printable first)
-ASCII:      cmp     #$20                      ; is character code byte < 32 decimal
+ASCII:      cmp     #$20                      ; check if charater byte is a space
             bcc     ASCII_1                   ; if so, print "."
-            cmp     #$7F                      ; is character code byte >= 127 decimal
-            bcs     ASCII_1                   ; if so, print "."
-            bcc     ASCII_2                   ; print character
+            cmp     #$60                      ; check if character byte is a grave accent
+            bcc     ASCII_2                   ; output character to screen buffer
+            cmp     #$C0                      
+            bcc     ASCII_1
+            cmp     #$DB
+            bcc     ASCII_3
 ASCII_1:    lda     #PERIOD                   ; load "." into accumulator
-ASCII_2:    sta     (LINEPTR),y               ; kernal - pointer to screen buffer for current line
-            lda     $0286
+ASCII_2:    and     #$3F
+ASCII_3:    and     #$7F
+ASCII_4:    sta     (LINEPTR),y               ; kernal - pointer to screen buffer for current line
+            lda     COLOUR                    ; character colour
             sta     ($F3),y
-ASCII_3:    jsr     INCPC                     ; increment program counter
+ASCII_5:    jsr     INCPC                     ; increment program counter
             iny
-            cpy     #80
+            cpy     #NUMCOLS                  ; screen mode width
             rts
      
 ;; check stop/pause condition, return with carry set
@@ -1409,10 +1407,10 @@ LC8C3:      tay
 LC8C4:      txa
 
 ;; output 16-bit integer in A/Y as HEX, binary and decimal
-LC8C5:      sta     PCH                       ; commandline input in big-endian, high byte
-            sty     PCL                       ; commandline input in big-endian, low byte
-            sta     HEXLB                     ; convert hex number to little-endian, low byte
-            sty     HEXHB                     ; convert hex number to little-endian, high byte
+LC8C5:      sta     PCH                       ; commandline input high byte,  big-endian
+            sty     PCL                       ; commandline input low byte,   big-endian
+            sta     HEXLB                     ; convert hex number low byte,  little-endian
+            sty     HEXHB                     ; convert hex number high byte, little-endian
             php
             lda     #$00
             sta     CSRCOL                    ; kernal - current cursor column pointer
@@ -2127,7 +2125,7 @@ LCDF2:      lda     IRQ_LO
 
 ;; EXIT SMON (X)        
 EXIT:       jsr     RETURN                    ; output ASCII carriage return (CR)
-            jmp     WARMSTART                 ; exit to BASIC or return to SMON if no underlying
+            jmp     SOFTRESET                 ; exit to BASIC or return to SMON if no underlying
 
 
 ;; print 16-bit integer in $A2/$A3 as decimal value, adapted from:
@@ -2197,12 +2195,12 @@ DEC16EXIT:  rts
 ;;; ---------------------------  C64 KERNAL routines   -------------------------
 ;;; ----------------------------------------------------------------------------
 
-LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $0B7F
-NUMCOLS     := 80                             ; number of columns per row
+LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $07E7
+NUMCOLS     := 40                             ; number of columns per row
 NUMROWS     := 24                             ; number of rows
 INPUT_UCASE := 0                              ; do not automatically convert input to uppercase
 SUPPRESS_NP := 0                              ; do not suppress any characters on output
-WARMSTART   := $A474                          ; Restart BASIC
+SOFTRESET   := $A474                          ; Exit to BASIC
         
 ;;; ----------------------------------------------------------------------------
 ;;; ----------------------  C64 KERNAL zero page address   ---------------------
@@ -2253,7 +2251,7 @@ LASTPRNT    := $D7           ; last character printed to screen
 
         ;; re-print the current line
 PRLINE:     lda     #13                       ; print CR
-            jsr     UAPUTW                    ; (move terminal cursor to beginning of line)
+            jsr     CHROUT                    ; (move terminal cursor to beginning of line)
             lda     #0                        ; set terminal cursor position to 0
             sta     TERMCOL                   ; fall through to print line buffer
         
@@ -2279,7 +2277,7 @@ PREOL1:     iny
               bcs     PREOL4
 PREOL3:       lda     #$20
 PREOL4:     .endif
-            jsr     UAPUTW                    ; output character
+            jsr     CHROUT                    ; output character
             cpy     TMPBUF
             bne     PREOL1
             sty     TERMCOL                   ; set new cursor position
