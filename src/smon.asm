@@ -209,7 +209,7 @@ FSFLAG1:    .byte   $02,$01,$01,$02,$00
 
 REGHDR:     .byte   $0D,$0D,$20,$20,"PC  SR AC XR YR SP  NV-BDIZC",$00
 DEBUGHDR:   .byte   $0D,$0D,$20,$20,"PC   MACHINE",$00
-TRACEHDR:   .byte   $20,$20,$20,"OPC  ADR",$00
+TRACEHDR:   .byte   $20,$20,$20,"OPC ADR",$00
 LC0AC:      .byte   $00,$02,$04
 LC0AF:      .byte   $01,$2C,$00
 LC0B2:      .byte   $2C,$59,$29
@@ -921,7 +921,7 @@ LC564:      jsr     LC58C
             bne     LC586
             nop
 LC576:      jsr     RETURN                    ; output ASCII carriage return (CR)
-            ldx     #$23
+            ldx     #$21                      ; amount of bounding line chars
             lda     #MINUS                    ; load accumulator with minus character byte "-"
 LC580:      jsr     CHROUT                    ; output a minus character "-"
             dex
@@ -935,10 +935,10 @@ LC58C:      ldx     #COMMA                    ; output NEWLINE followed by ","
             jsr     SPACE                     ; output SPACE Character
 LC597:      jsr     LC675                     ; erase to end of line
             jsr     LC4CB
-            jsr     SPACE                     ; output SPACE Character
+            jsr     SPACE                     ; output space character
 LC5A0:      lda     (PCH),y                   ; get data byte
             jsr     HEXOUT1                   ; output byte in A
-            jsr     SPACE                     ; output SPACE Character
+            jsr     SPACE                     ; output space character
             iny
             cpy     BEFLEN
             bne     LC5A0
@@ -947,10 +947,11 @@ LC5A0:      lda     (PCH),y                   ; get data byte
             sbc     BEFLEN
             tax
             beq     SPCOC
-LC5B5:      jsr     DBLSPACE                  ; output two SPACE Characters
+LC5B5:      jsr     DBLSPACE                  ; output two space characters
+            jsr     SPACE                     ; output a single space character
             dex
             bne     LC5B5
-SPCOC:      jmp     ILOPCD                   ; output illegal opcode
+SPCOC:      jmp     ILOPCD                    ; output illegal opcode
             .byte   $D2
             .byte   $FF
             ldy     #$00
@@ -996,7 +997,6 @@ LC616:      jsr     CHROUT
             lda     #$20
             bit     ADRCODE
             beq     LC622
-            jsr     DBLSPACE                  ; output two SPACE characters
 LC622:      ldx     #$20
             lda     #$04
             bit     ADRCODE
@@ -1027,7 +1027,7 @@ LC657:      lda     LC0AC,y
             beq     LC667
             lda     LC0AF,y
             ldx     LC0B2,y
-            jsr     CHAROUT                     ; output ASCII character in X register
+            jsr     CHAROUT                   ; output ASCII character in X register
 LC667:      dey
             bne     LC657
 LC66A:      lda     BEFLEN
