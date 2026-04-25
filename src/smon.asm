@@ -209,7 +209,7 @@ FSFLAG1:    .byte   $02,$01,$01,$02,$00
 
 REGHDR:     .byte   $0D,$0D,$20,$20,"PC  SR AC XR YR SP  NV-BDIZC",$00
 DEBUGHDR:   .byte   $0D,$0D,$20,$20,"PC   MACHINE",$00
-TRACEHDR:   .byte   $20,$20,$20,"OPC ADR",$00
+TRACEHDR:   .byte   $20,$20,$20,$20,"OPC  ADR",$00
 LC0AC:      .byte   $00,$02,$04
 LC0AF:      .byte   $01,$2C,$00
 LC0B2:      .byte   $2C,$59,$29
@@ -468,6 +468,9 @@ BIN16BIT:   lda     HEXHB                     ; load high byte hex number to con
             jsr     BIN8BIT                   ; convert to 8-bit binary and output string
             lda     HEXLB                     ; load low byte hex number to convert
             jmp     BIN8BIT                   ; convert to 8-bit binary and output string
+
+;; output three SPACE characters
+TRPLSPACE:  jsr     SPACE                     ; loop to ouput third space character
 
 ;; output two SPACE characters
 DBLSPACE:   jsr     SPACE                     ; loop to ouput second space character
@@ -947,8 +950,7 @@ LC5A0:      lda     (PCH),y                   ; get data byte
             sbc     BEFLEN
             tax
             beq     SPCOC
-LC5B5:      jsr     DBLSPACE                  ; output two space characters
-            jsr     SPACE                     ; output a single space character
+LC5B5:      jsr     TRPLSPACE                 ; output two space characters
             dex
             bne     LC5B5
 SPCOC:      jmp     ILOPCD                    ; output illegal opcode
@@ -958,6 +960,7 @@ SPCOC:      jmp     ILOPCD                    ; output illegal opcode
             ldx     BEFCODE
 LC5C7:      bne     LC5DA
 LC5C9:      ldx     #$03
+            jsr     SPACE                     ; output a single space character
 LC5CB:      lda     #AST
             jsr     CHROUT
             dex
@@ -988,12 +991,14 @@ LC5DA:      bit     BINARYNUM
             ldy     BEFLEN
             jsr     LC693
             jsr     LC4CB
-LC607:      lda     OPMN1-1,x
+LC607:      jsr     SPACE                     ; output a single space character
+            lda     OPMN1-1,x
             jsr     CHROUT
             lda     OPMN2-1,x
             jsr     CHROUT
             lda     OPMN3-1,x
 LC616:      jsr     CHROUT
+            jsr     SPACE                     ; output a single space character
             lda     #$20
             bit     ADRCODE
             beq     LC622
@@ -1001,6 +1006,7 @@ LC622:      ldx     #$20
             lda     #$04
             bit     ADRCODE
             beq     LC62C
+            jsr     SPACE                     ; output a single space character
             ldx     #LPAREN
 LC62C:      txa
             jsr     CHROUT
@@ -1370,8 +1376,9 @@ LCEEB:      ldx     $02C5
             bne     LCEF6
             jsr     SPACE                     ; output space
             jmp     LC5C9
-LCEF6:      lda     #$2A
-            jsr     CHROUT
+LCEF6:      jsr     SPACE                     ; output a single space character
+            lda     #AST                      ; load asterisk character byte in accumulator
+            jsr     CHROUT                    ; output an asterisk character
             lda     ILOPMN1-1,x
             jsr     CHROUT
             lda     ILOPMN2-1,x
