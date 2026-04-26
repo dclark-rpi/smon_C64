@@ -85,6 +85,9 @@ SAVEVECT    := $0332                          ; Vector: Kernel SAVE
 INTOUT      := $BDCD                          ; Output Positive Integer in A/X
 INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
 
+TEXTMODE    := $D018                          ; commodore 64 - switch character sets between 
+                                              ; lowercase mode - $17 or default mode - $15
+
 ;; Kernal Jump Table
 JMPTABLE    := $FF81                          ; Kernal routine start address
 CHRIN       := JMPTABLE+$4E     ; $FFCF       ; Kernal input routine
@@ -97,6 +100,7 @@ CR          := $0D                            ; carriage return
 SP          := $20                            ; space
 EXCL        := $21                            ; exclamation mark      !
 NUM         := $23                            ; number sign or hash   #
+QUOT        := $22                            ; double quotes         "
 DOLLAR      := $24                            ; dollar                $
 APOS        := $27                            ; single quote or tick  '
 LPAREN      := $28                            ; open bracket          (
@@ -135,7 +139,6 @@ HLPMSG:     .byte   "A xxxx - Assemble starting at x (end assembly with 'f', use
             .byte   "FI aa, xxxx yyyy - Find immediate argument used in opcode",0
             .byte   "G (xxxx) - Run from xxxx (omit for current Program Counter)",0
             .byte   "K xxxx (yyyy) - Dump memory from xxxx (to yyyy) as ASCII",0
-            .byte   "L - Load Intel HEX data from terminal",0
             .byte   "M xxxx (yyyy) - Dump memory from xxxx (to yyyy) as HEX",0
             .byte   "MS - Check and print memory size",0
             .byte   "MT xxxx yyyy (nn) - Test memory xxxx yyyyy (repeat n times)",0
@@ -161,7 +164,7 @@ HLPMSG:     .byte   "A xxxx - Assemble starting at x (end assembly with 'f', use
             .byte   0
         
 ;; commands
-CMDTBL:     .byte   "'#$%,:;=?ACDFGHKLMORTVWX"
+CMDTBL:     .byte   "'#$%,:;=?ACDFGIHKLMORSTVWX"
 CMDTBLE:    .byte   $00,$00,$00,$00,$00                        ; . .. ..
 
 ;; command entry point addresses
@@ -179,12 +182,14 @@ CMDS:       .byte   <(TICK-1),>(TICK-1)             ; '
             .byte   <(DISASS-1),>(DISASS-1)         ; D
             .byte   <(FIND-1),>(FIND-1)             ; F
             .byte   <(GO-1),>(GO-1)                 ; G
+            .byte   <(IOSET-1),>(IOSET-1)           ; I
             .byte   <(HELP-1),>(HELP-1)             ; H
             .byte   <(KONTROLLE-1),>(KONTROLLE-1)   ; K
-            .byte   <(LOAD-1),>(LOAD-1)             ; L
+            .byte   <(LOADSAVE-1),>(LOADSAVE-1)     ; L
             .byte   <(MEMDUMP-1),>(MEMDUMP-1)       ; M
             .byte   <(OCCUPY-1),>(OCCUPY-1)         ; O
             .byte   <(REGISTER-1),>(REGISTER-1)     ; R
+            .byte   <(LOADSAVE-1),>(LOADSAVE-1)     ; S
             .byte   <(TRACE-1),>(TRACE-1)           ; T
             .byte   <(MOVE-1),>(MOVE-1)             ; V
             .byte   <(WRITE-1),>(WRITE-1)           ; W
@@ -268,6 +273,8 @@ LCE4B:       .byte   $DF,$02,$02,$02,$02,$03,$03,$03
 
 ;; SMON START
 BREAK:      cld
+            lda     #$08
+            sta     IONO                      ; set drive #8
             ldx     #$05
 BREAK2:     pla
             sta     PCLSAVE,x                 ; store stack pointer
@@ -282,7 +289,7 @@ BREAK3:     dec     PCHSAVE                   ; decrement program counter stored
             lda     #'R'                      ; execute 'R' command
             jmp     CMDSTORE                  ; jump to main loop
         
-GETSTART:   jsr     GETRETURN                 ; check for return
+GETSTART:   jsr     CHKRETURN                 ; check for carriage return
             beq     GETSTRTS
 GETSTART1:  jsr     GETADR                    ; get memory address from commandline
             sta     PCHSAVE                   ; store program counter (high byte)
@@ -303,7 +310,7 @@ GETADRSE:   jsr     GETADR                    ; get memory address from commandl
             sta     ECH                       ; store end address (high byte), big-endian
             lda     #$FF                      ; mask
             sta     ECL                       ; store end address (low byte), big-endian
-            jsr     GETRETURN                 ; is there more commandline input?
+            jsr     CHKRETURN                 ; is there more commandline input?
             bne     GETADRX                   ; yes, get another memory address
             sta     KBDBUF                    ; put NUL into keyboard buffer
             inc     $C6
@@ -361,7 +368,7 @@ SKIPSPACE:  jsr     GETCHRET                  ; get next character until a carri
             rts
 
 ;; check if next character on commandline is CR (set Z status bit if so)
-GETRETURN:  jsr     CHRIN
+CHKRETURN:  jsr     CHRIN
             dec     CSRCOL                    ; kernal - current cursor column pointer ($D3)
             cmp     #CR                       ; is character byte a carriage return (CR)
 GETBRTS:    rts
@@ -528,7 +535,9 @@ INCPC:      inc     PCH                       ; increase program counter high by
 INCRTS:     rts
 
 ;; HELP (H)
-HELP:       lda     #<HLPMSG                  ; get help message start addr
+HELP:    ;   ldy     #$17                      ; value for lowercase mode on C64
+         ;   sty     TEXTMODE                  ; change character set to lowercase mode
+            lda     #<HLPMSG                  ; get help message start addr
             sta     $BB                       ; into $BB/$BC
             lda     #>HLPMSG
             sta     $BC
@@ -544,6 +553,8 @@ HLPL1:      jsr     RETURN                    ; output ASCII carriage return (CR
 HLPL2:      jsr     KBDKEY                    ; check for PAUSE,STOP from commandline
             lda     ($BB),y                   ; get first byte of next string
             bne     HLPL1                     ; loop if not 0
+         ;   ldy     #$15                      ; value for default mode on C64
+         ;   sty     TEXTMODE                  ; return character set to default mode
             rts
                 
 ;; REGISTER (R)
@@ -595,107 +606,48 @@ GO_LOOP:    lda     $01AE,x
             pla
             rti
 
-;; LOAD INTEL HEX (L)
-LOAD:       lda     #13
-            jsr     CHROUT
-LDNXT:      jsr     UAGETW                    ; get character from UART
-            cmp     #SP                       ; is character byte a space " "
-            beq     LDNXT                     ; ignore space at beginning of line
-            cmp     #13
-            beq     LDNXT                     ; ignore CR at beginning of line
-            cmp     #10
-            beq     LDNXT                     ; ignore LF at beginning of line
-            cmp     #27
-            beq     LDBRK                     ; stop when receiving BREAK
-            cmp     #3
-            beq     LDBRK                     ; stop when receiving CTRL-C
-            cmp     #':'                      ; expect ":" at beginning of line
-            bne     LDEIC
-            jsr     LDBYT                     ; get record byte count
-            tax
-            jsr     LDBYT                     ; get address low byte
-            sta     PCL
-            jsr     LDBYT                     ; get address high byte
-            sta     PCH
-            jsr     LDBYT                     ; get record type
-            beq     LDDR                      ; jump if data record (record type 0)
-            cmp     #1                        ; end-of-file record (record type 1)
-            bne     LDERI                     ; neither a data nor eof record => error
+;; IO SET (I)
+IOSET:      jsr     GETBYT
+            sta     IONO
+            rts
+LSERROR:    jmp     ERROR
 
-;; read Intel HEX end-of-file record
-            jsr     LDBYT                     ; get next byte (should be checksum)
-            cmp     #$FF                      ; checksum of EOF record is FF
-            bne     LDECS                     ; error if not
-LDEOF:      rts
-
-;; read Intel HEX data record
-LDDR:       clc                               ; prepare checksum
-            txa                               ; byte count
-            adc     PCH                       ; address high
-            clc
-            adc     PCL                       ; address low
-            sta     ECH                       ; store checksum
-            ldy     #0                        ; offset
-            inx
-LDDR1:      dex                               ; decrement number of bytes
-            beq     LDDR2                     ; done if 0
-            jsr     LDBYT                     ; get next data byte
-            sta     (PCH),y                   ; store data byte
-            cmp     (PCH),y                   ; check data byte
-            bne     LDEM                      ; memory error if no match
-            clc
-            adc     ECH                       ; add to checksum
-            sta     ECH                       ; store checksum
+;; LOAD/SAVE (L/S)
+LOADSAVE:   ldy     #$02
+            sty     $BC                        ; BC has a value of two
+            dey
+            sty     $B9                        ; B9 has a value of one
+            sty     $BB                        ; BB has a value of one
+            dey
+            sty     $B7                        ; B7 has a value of zero
+            jsr     GETCHRET
+            cmp     #QUOT                      ; is next character byte a double quote ' " '
+            bne     LSERROR                    ; error if opening double quote not found
+LSI:        jsr     GETCHRET
+            sta     ($BB),y                    ; store filename in a string
             iny
-            bne     LDDR1
-LDDR2:      jsr     LDBYT                     ; get checksum byte
-            clc
-            adc     ECH                       ; add to computed checkum
-            bne     LDECS                     ; if sum is 0 then checksum is ok
-            lda     #'+'
-            jsr     UAPUTW
-            inc     $D3
-            cpy     #0                        ; did we have 0 bytes in this record?
-            bne     LDNXT                     ; if not then expect another record
-            beq     LDEOF                     ; end of file
-
-        
-LDBRK:      lda     #'B'                      ; received BREAK (ESC)
-            .byte   $2C
-LDERI:      lda     #'R'                      ; unknown record identifier error
-            .byte   $2C
-LDECS:      lda     #'C'                      ; checksum error
-            .byte   $2C
-LDEIC:      lda     #'I'                      ; input character error
-            .byte   $2C
-LDEM:       lda     #'M'                      ; memory error
-            jsr     CHROUT
-LDERR:      jmp     ERROR
-        
-;; get HEX byte from UART
-LDBYT:      jsr     LDNIB                     ; get high nibble
-            asl
-            asl
-            asl
-            asl
-            sta     $B4
-            jsr     LDNIB                     ; get low libble
-            ora     $B4                       ; combine
-            rts
-;; get HEX character from UART, convert to 0-15
-LDNIB:      jsr     UAGETW                    ; get character from UART
-            jsr     UCASE                     ; convert to uppercase
-            cmp     #'0'
-            bcc     LDEIC
-            cmp     #'F'+1
-            bcs     LDEIC
-            cmp     #'9'+1
-            bcc     LDBYT2
-            cmp     #'A'
-            bcc     LDEIC
-            adc     #$08
-LDBYT2:     and     #$0F
-            rts
+            inc     $B7 
+            cmp     #QUOT                      ; is next character byte a double quote ' " '
+            bne     LSI
+            dec     $B7
+            lda     IONO
+            sta     $BA
+            lda     COMMAND
+            cmp     #$53                      ; check if an ASCII 'S' has been entered
+            beq     SAVE
+LOAD_S:     jsr     CHKRETURN                 ; check for carriage return
+            beq     LOAD1
+            ldx     #$C3
+            jsr     GETADRX
+            lda     #$00
+            sta     $B9
+LOAD1:      lda     #$00
+            jmp     (LOADVECT)
+SAVE:       ldx     #$C1
+            jsr     GETADRX
+            ldx     #$AE
+            jsr     GETADRX
+            jmp     (SAVEVECT)
                 
 ;; MEMORY DUMP (M)
 MEMDUMP:    jsr     GETCHRET                  ; get next character until a carriage return
@@ -1631,7 +1583,6 @@ LCABA:      ldx     #$27
 LCAC9:      lda     (PCH,x)                   ; get next byte
             jsr     ASCII                     ; write ASCII char of byte directly to screen
             bne     LCAC9                     ; repeat until end of line
-            jsr     PREOL                     ; print to end of line
             ldx     #$00
             jsr     CHECKEND
             beq     LCADA
@@ -1823,7 +1774,7 @@ MEMTST:     ldx     #ADRBUF                   ; load address buffer $A4
             jsr     GETADRX                   ; get start address
             jsr     GETADRX                   ; get end address
             ldy     #1                        ; default: 1 repetition
-            jsr     GETRETURN                 ; do we have more arguments?
+            jsr     CHKRETURN                 ; do we have more arguments?
             beq     MTL1                      ; skip if not
             jsr     GETBYT                    ; get number of repetitions
             tay
@@ -2251,41 +2202,3 @@ LASTPRNT    := $D7           ; last character printed to screen
               .endif
              .endif
             .endif
-
-;;; ----------------------------------------------------------------------------
-;;; --------------------------  C64 KERNAL routines  ---------------------------
-;;; ----------------------------------------------------------------------------
-
-        ;; re-print the current line
-PRLINE:     lda     #13                       ; print CR
-            jsr     CHROUT                    ; (move terminal cursor to beginning of line)
-            lda     #0                        ; set terminal cursor position to 0
-            sta     TERMCOL                   ; fall through to print line buffer
-        
-        ;; print characters in line buffer after terminal cursor position
-PREOL:      ldy     #NUMCOLS-1                ; start at end of line buffer
-PREOL0:     cpy     TERMCOL                   ; have we reached the cursor column yet?
-            beq     PREOL2                    ; jump if Y<=TERMCOL
-            bcc     PREOL2
-            lda     (LINEPTR),Y               ; get character
-            dey     
-            cmp     #$20                      ; is it SPACE?
-            beq     PREOL0                    ; repeat if so
-            iny                               ; remember one more than last
-            sty     TMPBUF                    ; non-space column after cursor
-            ldy     TERMCOL
-            dey
-PREOL1:     iny
-            lda     (LINEPTR),Y               ; get character
-            .if     SUPPRESS_NP
-              cmp     #$80                    ; ignore
-              bcs     PREOL3                  ; non-printable
-              cmp     #$20                    ; characters
-              bcs     PREOL4
-PREOL3:       lda     #$20
-PREOL4:     .endif
-            jsr     CHROUT                    ; output character
-            cpy     TMPBUF
-            bne     PREOL1
-            sty     TERMCOL                   ; set new cursor position
-PREOL2:     rts
