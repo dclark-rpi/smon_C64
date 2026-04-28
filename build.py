@@ -10,6 +10,7 @@ def compile() -> subprocess.CompletedProcess:
     compile_cmd = [
         'vasm6502_oldstyle',
         '-Fbin',
+        '-esc',
         '-cbm-prg',
         '-dotdir',
         '-c02',
