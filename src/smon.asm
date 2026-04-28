@@ -99,8 +99,8 @@ GETIN       := JMPTABLE+$63     ; $FFE4       ; Kernal get input routine
 CR          := $0D                            ; carriage return
 SP          := $20                            ; space
 EXCL        := $21                            ; exclamation mark      !
-NUM         := $23                            ; number sign or hash   #
 QUOT        := $22                            ; double quotes         "
+NUM         := $23                            ; number sign or hash   #
 DOLLAR      := $24                            ; dollar                $
 APOS        := $27                            ; single quote or tick  '
 LPAREN      := $28                            ; open bracket          (
@@ -139,11 +139,13 @@ HLPMSG:     .byte   "A xxxx - Assemble starting at x (end assembly with 'f', use
             .byte   "FI aa, xxxx yyyy - Find immediate argument used in opcode",0
             .byte   "G (xxxx) - Run from xxxx (omit for current Program Counter)",0
             .byte   "K xxxx (yyyy) - Dump memory from xxxx (to yyyy) as ASCII",0
+            .byte   "L\"Filename\" xxxx - Loading address xxxx is optional",0
             .byte   "M xxxx (yyyy) - Dump memory from xxxx (to yyyy) as HEX",0
             .byte   "MS - Check and print memory size",0
             .byte   "MT xxxx yyyy (nn) - Test memory xxxx yyyyy (repeat n times)",0
             .byte   "O xxxx yyyy (aa) - Fill memory xxxx yyyy with aa (omit aa to zero erase)",0
             .byte   "R - Display Processor Registers",0
+            .byte   "S\"Filename\" xxxx yyyy - Save from xxxx to yyyy on floppy or tape",0
             .if     VIA > 0
               .byte   "TW xxxx - Trace walk (single step)",0
               .byte   "TB xxxx nn - Trace break (set break point at x, stop when hit n times)",0
@@ -477,10 +479,10 @@ BIN16BIT:   lda     HEXHB                     ; load high byte hex number to con
             jmp     BIN8BIT                   ; convert to 8-bit binary and output string
 
 ;; output three SPACE characters
-TRPLSPACE:  jsr     SPACE                     ; loop to ouput third space character
+TRPLSPACE:  jsr     SPACE                     ; loop to output third space character
 
 ;; output two SPACE characters
-DBLSPACE:   jsr     SPACE                     ; loop to ouput second space character
+DBLSPACE:   jsr     SPACE                     ; loop to output second space character
 
 ;; output SPACE Character
 SPACE:      lda     #SP                       ; load accumulator with a space character byte " "
@@ -535,26 +537,32 @@ INCPC:      inc     PCH                       ; increase program counter high by
 INCRTS:     rts
 
 ;; HELP (H)
-HELP:    ;   ldy     #$17                      ; value for lowercase mode on C64
-         ;   sty     TEXTMODE                  ; change character set to lowercase mode
+HELP:       ldy     #$17                      ; value for lowercase mode on C64
+            sty     TEXTMODE                  ; change character set to lowercase mode
             lda     #<HLPMSG                  ; get help message start addr
             sta     $BB                       ; into $BB/$BC
             lda     #>HLPMSG
             sta     $BC
-            ldy     #$00
+            ldy     #$00                      
 HLPL1:      jsr     RETURN                    ; output ASCII carriage return (CR)
             jsr     STROUT1                   ; output string until 0
-            iny                               ; next byte
-            cpy     #20                       ; are we at line 20?
+            iny                               ; increase line count
+            cpy     #12                       ; are we at line 12? if yes pause
             bne     HLPL2                     ; jump if not
-            lda     #SP                       ; load accumulator with a space character byte " "
-            sta     KBDBUF                    ; load " " byte into keyboard buffer (to pause output)
-            inc     $C6
+            jsr     PAUSE                     ; if line count has been reached, pause
+            ldy     #$00                      ; reset line counter
 HLPL2:      jsr     KBDKEY                    ; check for PAUSE,STOP from commandline
             lda     ($BB),y                   ; get first byte of next string
-            bne     HLPL1                     ; loop if not 0
-         ;   ldy     #$15                      ; value for default mode on C64
-         ;   sty     TEXTMODE                  ; return character set to default mode
+            bne     HLPL1                     ; loop if byte is not 0
+            jsr     PAUSE
+            ldy     #$15                      ; value for default mode on C64
+            sty     TEXTMODE                  ; return character set to default mode
+            rts
+
+PAUSE:      lda     #SP                       ; load accumulator with a space character byte " "
+            sta     KBDBUF                    ; load " " byte into keyboard buffer (to pause output)
+            inc     $C6                       ; advance just one line, (routine doesn't work without)
+            jsr     KBDKEY                    ; check for PAUSE
             rts
                 
 ;; REGISTER (R)
