@@ -49,6 +49,8 @@ BEFCODE     := $AD                            ; Instruction code for assembler/d
 LOPER       := $AE                            ; Low operand for assembler/disassembler.
 HOPER       := $AF                            ; High operand for assembler/disassembler.
 NUMCMDS     := $B1                            ; Hex number of SMON commands in table
+NUMCOLS     := $B2                            ; number of columns per row - screen width in hex
+NUMROWS     := $B3                            ; number of rows - screen height in hex
 BEFLEN      := $B6                            ; Instruction length for assembler/disassembler.
 ;; $FB to $FE are used as commandline argument pointers for subroutines or user programs
 PCH         := $FB                            ; commandline argument 1 (high byte), big-endian
@@ -82,6 +84,8 @@ BRK_HI      := $0317                          ; Vector: BRK Hi
 LOADVECT    := $0330                          ; Vector: Kernel LOAD
 SAVEVECT    := $0332                          ; Vector: Kernel SAVE
 
+SOFTRESET   := $A474                          ; Exit to BASIC
+
 INTOUT      := $BDCD                          ; Output Positive Integer in A/X
 INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
 
@@ -94,6 +98,7 @@ CHRIN       := JMPTABLE+$4E     ; $FFCF       ; Kernal input routine
 CHROUT      := JMPTABLE+$51     ; $FFD2       ; Kernal output routine
 STOPKEY     := JMPTABLE+$60     ; $FFE1       ; Kernal test STOP routine
 GETIN       := JMPTABLE+$63     ; $FFE4       ; Kernal get input routine
+SCREEN      := JMPTABLE+$6C     ; $FFED       ; Kernal gets size of screen display
 
 ;; ASCII-Table control codes and characters
 CR          := $0D                            ; carriage return
@@ -275,8 +280,11 @@ LCE4B:       .byte   $DF,$02,$02,$02,$02,$03,$03,$03
 
 ;; SMON START
 BREAK:      cld
-            lda     #$08
+            lda     #$08                      ; set to #1 for tape, #8 for floppy disk
             sta     IONO                      ; set drive #8
+            jsr     SCREEN                    ; get screen width and height
+            stx     NUMCOLS                   ; store screen width in hex
+            sty     NUMROWS                   ; store screen height in hex
             ldx     #$05
 BREAK2:     pla
             sta     PCLSAVE,x                 ; store stack pointer
@@ -559,6 +567,7 @@ HLPL2:      jsr     KBDKEY                    ; check for PAUSE,STOP from comman
             sty     TEXTMODE                  ; return character set to default mode
             rts
 
+;; Text display pause routine
 PAUSE:      lda     #SP                       ; load accumulator with a space character byte " "
             sta     KBDBUF                    ; load " " byte into keyboard buffer (to pause output)
             inc     $C6                       ; advance just one line, (routine doesn't work without)
@@ -745,7 +754,7 @@ ASCII_4:    sta     (LINEPTR),y               ; kernal - pointer to screen buffe
             sta     ($F3),y
 ASCII_5:    jsr     INCPC                     ; increment program counter
             iny
-            cpy     #NUMCOLS                  ; screen mode width
+            cpy     NUMCOLS                   ; screen mode width
             rts
      
 ;; check stop/pause condition, return with carry set
@@ -2162,11 +2171,8 @@ DEC16EXIT:  rts
 ;;; ----------------------------------------------------------------------------
 
 LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $07E7
-NUMCOLS     := 40                             ; number of columns per row
-NUMROWS     := 24                             ; number of rows
 INPUT_UCASE := 0                              ; do not automatically convert input to uppercase
 SUPPRESS_NP := 0                              ; do not suppress any characters on output
-SOFTRESET   := $A474                          ; Exit to BASIC
         
 ;;; ----------------------------------------------------------------------------
 ;;; ----------------------  C64 KERNAL zero page address   ---------------------
