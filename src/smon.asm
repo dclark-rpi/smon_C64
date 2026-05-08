@@ -493,9 +493,9 @@ BIN2STR:    jsr     CHROUT                    ; display binary digit
             rts
 
 ;; output 16-bit binary string
-BIN16BIT:   lda     HEXHB                     ; load high byte hex number to convert
+BIN16BIT:   lda     HEXLB                     ; load low byte hex number to convert
             jsr     BIN8BIT                   ; convert to 8-bit binary and output string
-            lda     HEXLB                     ; load low byte hex number to convert
+            lda     HEXHB                     ; load high byte hex number to convert
             jmp     BIN8BIT                   ; convert to 8-bit binary and output string
 
 ;; output three SPACE characters
@@ -1459,11 +1459,11 @@ ADD_16BIT:  clc                               ; clear carry flag for addition
             lda     ECH                       ; second commandline input high byte
             adc     PCH                       ; first commandline input high byte
             sta     PCH                       ; store high byte addition answer for HEXOUT
-            sta     HEXLB                     ; store low byte addition answer, little-endian
+            sta     HEXHB                     ; store high byte addition answer, little-endian
             lda     ECL                       ; second commandline input low byte
             adc     PCL                       ; first commandline input low byte
             sta     PCL                       ; store low byte addition answer for HEXOUT
-            sta     HEXHB                     ; store high byte addition answer, little-endian
+            sta     HEXLB                     ; store low byte addition answer, little-endian
             jmp     OUT_16BIT                 ; display answer
 
 ;; this subtraction routine is in big-endian format, then converted to little-endian
@@ -1473,11 +1473,11 @@ SUB_16BIT:  sec                               ; set carry flag for subtraction
             lda     PCH                       ; first commandline input high byte
             sbc     ECH                       ; second commandline input high byte
             sta     PCH                       ; store high byte addition answer for HEXOUT
-            sta     HEXLB                     ; store low byte addition answer, little-endian
+            sta     HEXHB                     ; store high byte addition answer, little-endian
             lda     PCL                       ; first commandline input low byte
             sbc     ECL                       ; second commandline input low byte
             sta     PCL                       ; store low byte addition answer for HEXOUT
-            sta     HEXHB                     ; store high byte addition answer, little-endian
+            sta     HEXLB                     ; store low byte addition answer, little-endian
             jmp     OUT_16BIT                 ; display answer
         
 ;; CONVERT HEXADECIMAL ($)
@@ -1493,30 +1493,30 @@ BEFHEX:     jsr     GETBYT
 ;; CONVERT BINARY (%)
 BEFBIN:     jsr     SKIPSPACE                 ; get input, skip any spaces on commandline
             ldy     #$08                      ; number of binary bits to display either $08 or $10
-LC921:      pha                               ; push accumulator onto stack
+BIN_CONV:   pha                               ; push accumulator onto stack
             jsr     GETCHRET                  ; get next character until a carriage return
             cmp     #ONE                      ; compare accumulator with ASCII one
             pla                               ; pull accumulator from stack
             rol                               ; rotate one bit left in accumulator
             dey                               ; decrement number of bits still to output by 1
-            bne     LC921                     ; if Y register is not zero loop routine
+            bne     BIN_CONV                  ; if Y register is not zero loop routine
             beq     OUT_SAVE                  ; if Y register is zero then jump to output routine
 
 ;; CONVERT DECIMAL (#)
 BEFDEC:     jsr     SKIPSPACE
             ldx     #$00
             txa
-LC934:      stx     PCH
+DEC_START:  stx     PCH
             sta     PCL
             tay
             jsr     CHRIN
             cmp     #COLON                    ; is character byte a ":"
             bcs     XTOA                      ; transfer x-register to accumulator and output
             sbc     #$2F
-            bcs     LC948
+            bcs     DEC_CONV
             sec
             jmp     XTOA                      ; transfer x-register to accumulator and output
-LC948:      sta     ECH
+DEC_CONV:   sta     ECH
             asl     PCH
             rol     PCL
             lda     PCL
@@ -1536,23 +1536,23 @@ LC948:      sta     ECH
             adc     PCL
             plp
             adc     #$00
-            jmp     LC934
+            jmp     DEC_START
 
 ;; output 16-bit integer in A/Y as HEX, binary and decimal
 ATOY:       tay                               ; transfer accumulator to y-register
 XTOA:       txa                               ; transfer x-register to accumulator
-OUT_SAVE:   sty     PCL                       ; commandline input low byte,   big-endian
-            sta     PCH                       ; commandline input high byte,  big-endian
-            sty     HEXHB                     ; convert hex number high byte, little-endian
-            sta     HEXLB                     ; convert hex number low byte,  little-endian
+OUT_SAVE:   sty     PCL                       ; commandline input low byte,    big-endian
+            sta     PCH                       ; commandline input high byte,   big-endian
+            sty     HEXLB                     ; convert hex number low byte,   little-endian
+            sta     HEXHB                     ; convert hex number high byte,  little-endian
 OUT_16BIT:  php
             lda     #$00
             sta     CSRCOL                    ; kernal - current cursor column pointer
             jsr     LC675                     ; erase screen buffer
             jsr     SPACE                     ; output a single SPACE character
-LC8E8:      jsr     HEXOUT
+            jsr     HEXOUT
             jsr     BIN16BIT                  ; display 16-bit binary string
-LC8EB:      jsr     SPACE                     ; output SPACE Character
+            jsr     SPACE                     ; output SPACE Character
             ldx     #$90
             lda     $01
             sta     MEM
@@ -1580,28 +1580,28 @@ DEC16PRT:   ldx     #5                        ; number of decimal digits to outp
             stx     PAD                       ; padding to print before decimal number
             cpx     #ZERO                     ; compare X register with ASCII zero
             beq     DEC16LP1                  ; if PAD is ASCII zero then jump to decimal routine
-            lda     HEXHB                     ; load high byte to check for zero
+            lda     HEXLB                     ; load low byte to check for zero
             cmp     #$00                      ; compare if high byte is zero
             bne     DEC16LP1                  ; if not zero jump to decimal conversion
-            lda     HEXLB                     ; load low byte to check for zero
+            lda     HEXHB                     ; load high byte to check for zero
             cmp     #$00                      ; compare if low byte is zero
             beq     ZERODIGIT                 ; if hex byte is zero jump to output a zero with SPACES
 DEC16LP1:   ldx     #$FF
             sec                               ; set carry, start with digit=-1
-DEC16LP2:   lda     HEXLB
+DEC16LP2:   lda     HEXHB
             sbc     DEC16POW,Y
-            sta     HEXLB                     ; subtract current tens
-            lda     HEXHB
+            sta     HEXHB                     ; subtract current tens
+            lda     HEXLB
             sbc     DEC16POW+1,Y
-            sta     HEXHB
+            sta     HEXLB
             inx
             bcs     DEC16LP2                  ; loop until < 0
-            lda     HEXLB                     ; add current tens back in
+            lda     HEXHB                     ; add current tens back in
             adc     DEC16POW,Y
-            sta     HEXLB
-            lda     HEXHB
-            adc     DEC16POW+1,Y
             sta     HEXHB
+            lda     HEXLB
+            adc     DEC16POW+1,Y
+            sta     HEXLB
             txa
             bne     DEC16DIGIT                ; not leading zero => skip
             lda     PAD
