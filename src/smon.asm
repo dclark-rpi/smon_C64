@@ -92,6 +92,7 @@ INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
 
 TEXTMODE    := $D018                          ; commodore 64 - switch character sets between 
                                               ; lowercase mode - $17 or default mode - $15
+RESET       := $FCE2                          ; cold start routine
 
 ;; Kernal Jump Table
 JMPTABLE    := $FF81                          ; Kernal routine start address
@@ -413,6 +414,9 @@ GETCHRET:   jsr     CHRIN
 ERROR:      lda     #QUEST                    ; print "?"
             jsr     CHROUT
 
+;; HARD RESET - cold start computer
+HARDRESET:  jmp     RESET                     ; kernal reset routine
+
 ;; main loop
 EXECUTE:    ldx     SPSAVE                    ; restore stack pointer                
             txs
@@ -430,6 +434,8 @@ CHKCMD:     cmp     CMDTAB,x                  ; check for line start command
             lda     #PERIOD                   ; print prompt (".")
             jsr     CHROUT
 EXEC1:      jsr     GETCHRET                  ; get next character until a carriage return
+            cmp     #$5F                      ; has left arrow key been pressed
+            beq     HARDRESET
             cmp     #PERIOD                   ; is character "."
             beq     EXEC1                     ; ignore leading "."
             jmp     CMDSTORE                  ; check entered command is valid and execute
@@ -2261,7 +2267,6 @@ LCDF2:      lda     IRQ_LO
 ;; EXIT SMON (X)        
 EXIT:       jsr     RETURN                    ; output ASCII carriage return (CR)
             jmp     SOFTRESET                 ; exit to BASIC or return to SMON if no underlying
-
 
 ;;; ----------------------------------------------------------------------------
 ;;; ---------------------------  C64 KERNAL routines   -------------------------
