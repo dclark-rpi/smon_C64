@@ -403,6 +403,9 @@ UCASE:      cmp     #'a'
             bcs     UCASE1
             and     #$DF
 UCASE1:     rts
+
+;; HARD RESET - cold start computer
+HARDRESET:  jmp     RESET                     ; kernal reset routine
         
 ;; get next character from commandline, error if CR (end of line)
 GETCHRET:   jsr     CHRIN
@@ -413,9 +416,6 @@ GETCHRET:   jsr     CHRIN
 ;; invalid input
 ERROR:      lda     #QUEST                    ; print "?"
             jsr     CHROUT
-
-;; HARD RESET - cold start computer
-HARDRESET:  jmp     RESET                     ; kernal reset routine
 
 ;; main loop
 EXECUTE:    ldx     SPSAVE                    ; restore stack pointer                
