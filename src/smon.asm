@@ -52,6 +52,7 @@ NUMCMDS     := $B1                            ; Hex number of SMON commands in t
 NUMCOLS     := $B2                            ; number of columns per row - screen width in hex
 NUMROWS     := $B3                            ; number of rows - screen height in hex
 BEFLEN      := $B6                            ; Instruction length for assembler/disassembler.
+KDBBUFNUM   := $C6                            ; number of characters currently in the keyboard buffer
 ;; $FB to $FE are used as commandline argument pointers for subroutines or user programs
 PCH         := $FB                            ; commandline argument 1 (high byte), big-endian
 PCL         := $FC                            ; commandline argument 1 (low byte),  big-endian
@@ -61,7 +62,7 @@ ECL         := $FE                            ; commandline argument 2 (low byte
 ;; Outside the zero page, SMON uses the following areas:
 
 ;; KERNAL variables (0200-03FF)
-KDBBUFNUM   := $0276                          ; number of characters in keyboard buffer
+KDBBUFINDEX := $0276                          ; index or position in keyboard buffer pointer
 KBDBUF      := $0277                          ; buffer for keyboard commands from $0277 to $0280
 COLOUR      := $0286                          ; character colour
 
@@ -232,6 +233,10 @@ DATATAB:    .byte   $00,$7D,$4C,$7D,$C9,$0D,$0D,$20
             .byte   $20,$53,$50,$20,$20,$4E,$56,$2D
             .byte   $42,$44,$49,$5A,$43,$00
 
+MSMSG1:     .byte   $20,"MEMORY SIZE",$00
+MSMSG2:     .byte   $20,"-",$20,$00
+MSMSG3:     .byte   $20,"BYTES FREE",$00
+MSMSG4:     .byte   $20,$20,$20,$20,$20,$20,$20,"TOTAL",$00
 REGHDR:     .byte   $0D,$0D,$20,$20,"PC  SR AC XR YR SP  NV-BDIZC",$00
 DEBUGHDR:   .byte   $0D,$0D,$20,$20,"PC   MACHINE",$00
 TRACEHDR:   .byte   $20,$20,$20,$20,"OPC  ADR",$00
@@ -336,7 +341,7 @@ GETADRSE:   jsr     GETADR                    ; get memory address from commandl
             jsr     CHKRETURN                 ; is there more commandline input?
             bne     GETADRX                   ; yes, get another memory address
             sta     KBDBUF                    ; put NUL into keyboard buffer
-            inc     $C6
+            inc     KDBBUFNUM                 ; character count in keyboard buffer
             rts
 
 ;; get two words from commandline, store in $FB/$FC and $FD/$FE
@@ -421,7 +426,7 @@ ERROR:      lda     #QUEST                    ; print "?"
 EXECUTE:    ldx     SPSAVE                    ; restore stack pointer                
             txs
             ldx     #$00                      ; clear keyboard buffer
-            stx     $C6
+            stx     KDBBUFNUM                 ; character count in keyboard buffer
             lda     CSRCOL                    ; kernal - current cursor column pointer ($D3)
             beq     SKIPCR                    ; jump if zero
             jsr     RETURN                    ; output ASCII carriage return (CR)
@@ -527,6 +532,20 @@ XROUT:      txa                               ; get value from X register
 CHARRTN:    jsr     RETURN                    ; move pointer to next line
             jmp     XROUT                     ; output ASCII character in X register
 
+;; memory routine free byte message
+MSMESSAGE1: ldy     #>MSMSG1                  ; memory size string
+            lda     #<MSMSG1
+            jmp     STROUT                    ; output string to display
+MSMESSAGE2: ldy     #>MSMSG2                  ; to string
+            lda     #<MSMSG2
+            jmp     STROUT                    ; output string to display
+MSMESSAGE3: ldy     #>MSMSG3                  ; bytes free string
+            lda     #<MSMSG3
+            jmp     STROUT                    ; output string to display
+MSMESSAGE4: ldy     #>MSMSG4                  ; total string
+            lda     #<MSMSG4
+            jmp     STROUT                    ; output string to display
+
 ;; output header for processor registers
 REGHEADER:  ldy     #>REGHDR                  ; processor registers legend string
             lda     #<REGHDR
@@ -621,7 +640,7 @@ HLPL2:      jsr     KBDKEY                    ; check for PAUSE,STOP from comman
 ;; Text display pause routine
 PAUSE:      lda     #SP                       ; load accumulator with a space character byte " "
             sta     KBDBUF                    ; load " " byte into keyboard buffer (to pause output)
-            inc     $C6                       ; advance just one line, (routine doesn't work without)
+            inc     KDBBUFNUM                 ; advance just one line, (routine doesn't work without)
             jsr     KBDKEY                    ; check for PAUSE
             rts
                 
@@ -750,9 +769,9 @@ LC994:      jsr     CHROUT                    ; output
             cpx     #$49                      ; compare with decimal '73' to avoid oversized basic lines
             bcc     LC994                     ; branch if space for more data in the line
             ldx     #$09                      ; amount for complete message to print on screen
-LC9B3:      stx     $C6                       ; save x
+LC9B3:      stx     KDBBUFNUM                 ; save x into keyboard buffer character count
 LC9B5:      lda     BASICMSG-1,x              ; copy message
-            sta     KDBBUFNUM,x               ; into keyboard buffer
+            sta     KDBBUFINDEX,x             ; into keyboard buffer
             dex                               ; decrease counter
             bne     LC9B5                     ; branch if not last
             jmp     EXIT                      ; exit to basic
@@ -765,7 +784,7 @@ MEMDUMP:    jsr     GETCHRET                  ; get next character until a carri
             jmp     MEMTST                    ; if condition is true jump to memory test
 MD1:        cmp     #'S'                      ; is it 'S'
             bne     MD2                       ; check next condition
-            jmp     MEMSIZ                    ; if condition is true jump to free memory check
+            jmp     MEMSIZE1                  ; if condition is true jump to free memory check
 MD2:        cmp     #SP                       ; is character byte a space " "
             bne     MEMERR                    ; error if only 'M' is found with no qualifiers
 MEMDUMP1:   jsr     GETADRSE                  ; get start (FB/FC) and end address (FD/FE)
@@ -875,7 +894,7 @@ KBDKEY1:    jsr     SCANKEY                   ; check for STOP or keypress
             cmp     #SP                       ; is character byte a space " "
             bne     KBDRTS                    ; no => done
             sta     KBDBUF                    ; put SPACE in keyboard buffer
-            inc     $C6                       ; (i.e. advance just one line)
+            inc     KDBBUFNUM                 ; (i.e. advance just one line)
 KBDRTS:     rts
 
 ;; check for STOP or other keypress
@@ -1457,7 +1476,8 @@ CALCULATE:  jsr     GETADR
             jsr     RETURN                    ; output ASCII carriage return (CR)
             plp
             bcs     SUB_16BIT                 ; jump to subtraction routine
-            jmp     ADD_16BIT                 ; jump to addition routine
+            jsr     ADD_16BIT                 ; jump to addition routine
+            jmp     OUT_16BIT                 ; display answer
 
 ;; this addition routine is in big-endian format, then converted to little-endian
 ;; 16-bit Addition
@@ -1470,7 +1490,7 @@ ADD_16BIT:  clc                               ; clear carry flag for addition
             adc     PCL                       ; first commandline input low byte
             sta     PCL                       ; store low byte addition answer for HEXOUT
             sta     HEXLB                     ; store low byte addition answer, little-endian
-            jmp     OUT_16BIT                 ; display answer
+            rts
 
 ;; this subtraction routine is in big-endian format, then converted to little-endian
 ;; 16-bit Subtraction
@@ -1922,35 +1942,151 @@ LCBD6:      sta     DIGIT                     ; temp storage
 LCBF0:      rts
 
 ;; MEMORY SIZE (MS)
-MEMSIZ:     ldx     #3
-MSL1:       ldx     #$01                      ; get 00,01,FF,FF
-            stx     PCL                       ; into FB-FE
-            dex
-            stx     PCH
-            dex
-            stx     ECH
-            stx     ECL
-            jsr     RETURN                    ; output ASCII carriage return (CR)
-            ldx     #$00
-MSL2:       lda     (PCH,x)                   ; save current value
-            tay
-            lda     #$55
-            sta     (PCH,x)
-            cmp     (PCH,x)
-            bne     MSL5
-            lda     #BINARYNUM
-            sta     (PCH,x)
-            cmp     (PCH,x)
-            bne     MSL5
-MSL4:       tya
-            sta     (PCH,x)                   ; restore original value
-            jsr     INCPC                     ; increment program counter
-            jsr     CMPEND1                   ; check if we've tested the whole range
-            bcc     MSL2                      ; repeat if not
-            .byte   $2C                       ; skip following 2-byte opcode
-MSL5:       sta     (PCH,x)
-            jsr     HEXOUT                    ; print current address
-            rts                               ; done
+MEMADR1      := $0800
+MEMADR2      := $8000
+MEMADR3      := $C000
+MEMADR4      := $CFFF
+
+;; Start testing first memory range from $0800 up to $8000
+MEMSIZE1:   ldy     #$00                      ; clear a temp page 0 byte to store high address
+            sty     $0100                     ; store zero byte into memory counter high byte temp page
+            sty     $0101                     ; store zero byte into memory counter low byte temp page
+
+
+            lda     #<MEMADR1                 ; start memory page high byte
+            sta     $0102                     ; temp storage for current test page
+            jsr     RETURN                    ; move pointer to new line
+            jsr     RETURN                    ; move pointer to new line
+            jsr     MSMESSAGE1                ; memory size message
+
+TEST_LOOP1: lda     $0102                     ; current test page
+            sta     $0103                     ; store in memory-mapped location to test
+
+            lda     $0103                     ; read back to verify
+            cmp     $0102                     ; compare with current test page
+            bne     NO_RAM1                   ; if read != write, RAM ends
+
+            inc     $0100                     ; increment memory counter
+            inc     $0102                     ; increment current test page
+            lda     $0102                     ; read back to verify if complete
+            cmp     #<MEMADR2                 ; stop at 32K ($8000) (high byte)
+            bne     TEST_LOOP1                ; loop until end of RAM is reached
+
+            lda     #>MEMADR1                 ; start memory page low byte
+            sta     $0102                     ; temp storage for current test page
+
+TEST_LOOP2: lda     $0102                     ; current test page
+            sta     $0103                     ; store in memory-mapped location to test
+
+            lda     $0103                     ; read back to verify
+            cmp     $0102                     ; compare with current test page
+            bne     NO_RAM1                   ; if read != write, RAM ends
+
+            inc     $0101                     ; increment memory counter
+            inc     $0102                     ; increment current test page
+            lda     $0102                     ; read back to verify if complete
+            cmp     #>MEMADR2                 ; stop at 4K ($CFFF) (low byte)
+            bne     TEST_LOOP2                ; loop until end of RAM is reached
+
+NO_RAM1:    lda     #<MEMADR1                 ; start memory, high byte             
+            sta     PCH
+            lda     #>MEMADR1                 ; start memory, low byte
+            sta     PCL
+            jsr     RETURN                    ; move pointer to new line
+            jsr     SPACE                     ; output SPACE characters
+            jsr     HEXOUT                    ; output start memory range
+            jsr     MSMESSAGE2                ; hyphen for memory range
+            lda     #<MEMADR2                 ; end memory, high byte
+            sta     PCH
+            lda     #>MEMADR2                 ; end memory, low byte
+            sta     PCL
+            jsr     HEXOUT                    ; output end memory range
+            lda     $0100                     ; highest RAM Page is now in accumulator
+            sta     HEXHB                     ; store result required for decimal conversion
+            sta     MEM
+            lda     $0101                     ; highest RAM Page is now in accumulator
+            sta     HEXLB                     ; store result required for decimal conversion
+            sta     MEM+1
+            jsr     DBLSPACE                  ; output two SPACE characters
+            jsr     DEC16PRT                  ; display free memory in decimal
+            jsr     MSMESSAGE3                ; free bytes message
+
+;; Start testing second memory range from $C000 up to $CFFF
+MEMSIZE2:   ldy     #$00                      ; clear a temp page 0 byte to store high address
+            sty     $0100                     ; store zero byte into memory counter high byte temp page
+            sty     $0101                     ; store zero byte into memory counter low byte temp page
+
+            lda     #<MEMADR3                 ; start memory page high byte
+            sta     $0102                     ; temp storage for current test page
+         
+TEST_LOOP3: lda     $0102                     ; current test page
+            sta     $0103                     ; store in memory-mapped location to test
+
+            lda     $0103                     ; read back to verify
+            cmp     $0102                     ; compare with current test page
+            bne     NO_RAM2                   ; if read != write, RAM ends
+
+            inc     $0100                     ; increment memory counter
+            inc     $0102                     ; increment current test page
+            lda     $0102                     ; read back to verify if complete
+            cmp     #<MEMADR4                 ; stop at 4K ($CFFF) (high byte)
+            bne     TEST_LOOP3                ; loop until end of RAM is reached
+
+            lda     #>MEMADR3                 ; start memory page low byte
+            sta     $0102                     ; temp storage for current test page
+
+TEST_LOOP4: lda     $0102                     ; current test page
+            sta     $0103                     ; store in memory-mapped location to test
+
+            lda     $0103                     ; read back to verify
+            cmp     $0102                     ; compare with current test page
+            bne     NO_RAM2                   ; if read != write, RAM ends
+
+            inc     $0101                     ; increment memory counter
+            inc     $0102                     ; increment current test page
+            lda     $0102                     ; read back to verify if complete
+            cmp     #>MEMADR4                 ; stop at 4K ($CFFF) (low byte)
+            bne     TEST_LOOP4                ; loop until end of RAM is reached
+
+NO_RAM2:    lda     #<MEMADR3                 ; start memory, high byte             
+            sta     PCH
+            lda     #>MEMADR3                 ; start memory, low byte
+            sta     PCL
+            jsr     RETURN                    ; move pointer to new line
+            jsr     SPACE                     ; output SPACE characters
+            jsr     HEXOUT                    ; output start memory range
+            jsr     MSMESSAGE2                ; hyphen for memory range
+            lda     #<MEMADR4                 ; end memory, high byte
+            sta     PCH
+            lda     #>MEMADR4                 ; end memory, low byte
+            sta     PCL
+            jsr     HEXOUT                    ; output end memory range
+            lda     $0100                     ; highest RAM Page is now in accumulator
+            sta     HEXHB                     ; store result required for decimal conversion
+            sta     MEM+2
+            lda     $0101                     ; highest RAM Page is now in accumulator
+            sta     HEXLB                     ; store result required for decimal conversion
+            sta     MEM+3
+            jsr     DBLSPACE                  ; output two SPACE characters
+            jsr     DEC16PRT                  ; display free memory in decimal
+            jsr     MSMESSAGE3                ; free bytes message
+            
+            lda     MEM
+            sta     PCH
+            lda     MEM+1
+            sta     PCL
+            lda     MEM+2
+            sta     ECH
+            lda     MEM+3
+            sta     ECL
+            jsr     RETURN                    ; move pointer to new line
+            jsr     SPACE                     ; output SPACE characters
+            jsr     MSMESSAGE4                ; total message
+            jsr     SPACE                     ; output SPACE characters
+            jsr     ADD_16BIT                 ; calculate total memory
+            jsr     DEC16PRT                  ; display free memory in decimal
+            jsr     MSMESSAGE3                ; free bytes message
+            rts
         
 ;; MEMORY TEST (MT)
 MEMTST:     ldx     #ADRBUF                   ; load address buffer $A4
