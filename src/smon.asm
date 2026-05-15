@@ -1943,11 +1943,11 @@ LCBF0:      rts
 
 ;; MEMORY SIZE (MS)
 MEMADR1      := $0800                         ; first program memory start address
-MEMADR2      := $8000                         ; first program memory end address
+MEMADR2      := $7FFF                         ; first program memory end address
 MEMADR3      := $C000                         ; second program memory start address
 MEMADR4      := $CFFF                         ; second program memory end address
 
-;; Start testing first memory range from $0800 up to $8000
+;; Start testing first memory range from $0800 up to $7FFF
 MEMSIZE1:   ldy     #$00                      ; clear a temp page 0 byte to store high address
             sty     $0100                     ; store zero byte into memory counter high byte temp page
             sty     $0101                     ; store zero byte into memory counter low byte temp page
