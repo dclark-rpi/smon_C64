@@ -1942,10 +1942,10 @@ LCBD6:      sta     DIGIT                     ; temp storage
 LCBF0:      rts
 
 ;; MEMORY SIZE (MS)
-MEMADR1      := $0800
-MEMADR2      := $8000
-MEMADR3      := $C000
-MEMADR4      := $CFFF
+MEMADR1      := $0800                         ; first program memory start address
+MEMADR2      := $8000                         ; first program memory end address
+MEMADR3      := $C000                         ; second program memory start address
+MEMADR4      := $CFFF                         ; second program memory end address
 
 ;; Start testing first memory range from $0800 up to $8000
 MEMSIZE1:   ldy     #$00                      ; clear a temp page 0 byte to store high address
@@ -1988,6 +1988,7 @@ TEST_LOOP2: lda     $0102                     ; current test page
             cmp     #>MEMADR2                 ; stop at 4K ($CFFF) (low byte)
             bne     TEST_LOOP2                ; loop until end of RAM is reached
 
+;; output memory range including free memory
 NO_RAM1:    lda     #<MEMADR1                 ; start memory, high byte             
             sta     PCH
             lda     #>MEMADR1                 ; start memory, low byte
@@ -2003,10 +2004,10 @@ NO_RAM1:    lda     #<MEMADR1                 ; start memory, high byte
             jsr     HEXOUT                    ; output end memory range
             lda     $0100                     ; highest RAM Page is now in accumulator
             sta     HEXHB                     ; store result required for decimal conversion
-            sta     MEM
+            sta     MEM                       ; store high byte of free memory, range 1
             lda     $0101                     ; highest RAM Page is now in accumulator
             sta     HEXLB                     ; store result required for decimal conversion
-            sta     MEM+1
+            sta     MEM+1                     ; store low byte of free memory, range 1
             jsr     DBLSPACE                  ; output two SPACE characters
             jsr     DEC16PRT                  ; display free memory in decimal
             jsr     MSMESSAGE3                ; free bytes message
@@ -2048,6 +2049,7 @@ TEST_LOOP4: lda     $0102                     ; current test page
             cmp     #>MEMADR4                 ; stop at 4K ($CFFF) (low byte)
             bne     TEST_LOOP4                ; loop until end of RAM is reached
 
+;; output memory range including free memory
 NO_RAM2:    lda     #<MEMADR3                 ; start memory, high byte             
             sta     PCH
             lda     #>MEMADR3                 ; start memory, low byte
@@ -2063,21 +2065,22 @@ NO_RAM2:    lda     #<MEMADR3                 ; start memory, high byte
             jsr     HEXOUT                    ; output end memory range
             lda     $0100                     ; highest RAM Page is now in accumulator
             sta     HEXHB                     ; store result required for decimal conversion
-            sta     MEM+2
+            sta     MEM+2                     ; store high byte of free memory, range 2
             lda     $0101                     ; highest RAM Page is now in accumulator
             sta     HEXLB                     ; store result required for decimal conversion
-            sta     MEM+3
+            sta     MEM+3                     ; store low byte of free memory, range 2
             jsr     DBLSPACE                  ; output two SPACE characters
             jsr     DEC16PRT                  ; display free memory in decimal
             jsr     MSMESSAGE3                ; free bytes message
-            
-            lda     MEM
+
+;; calculate and output total free system memory
+            lda     MEM                       ; load high byte of free memory, range 1
             sta     PCH
-            lda     MEM+1
+            lda     MEM+1                     ; load low byte of free memory, range 1
             sta     PCL
-            lda     MEM+2
+            lda     MEM+2                     ; load high byte of free memory, range 2
             sta     ECH
-            lda     MEM+3
+            lda     MEM+3                     ; load low byte of free memory, range 2
             sta     ECL
             jsr     RETURN                    ; move pointer to new line
             jsr     SPACE                     ; output SPACE characters
