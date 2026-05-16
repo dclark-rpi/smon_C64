@@ -169,29 +169,25 @@ continue after it finishes (this only works if the `JSR` command is located in R
 
 SMON has a number of other "trace" related commands, a range of "find"
 commands to examine memory and several other commands. To get a quick overview
-of commands type "h" at the command line. For a bit more information on each command,
+of commands type "H" at the command line. For a bit more information on each command,
 refer to the [C64Wiki](https://www.c64-wiki.com/wiki/SMON) page or for the full description 
 read the [64er article](https://archive.org/details/64er_sonderheft_1985_08/page/n121/mode/2up) 
 (in German).
 
-## New commands
+### Load / Save your program
 
-### Intel HEX load
+To save a file the command is,
+.S"Filename" xxxx yyyy
+for example
+.S"TEST" 4000 400A 
+the filename is TEST and the program is stored in address 4000 to 4009, to correctly store the whole program you need to add one to the last address to be saved to disk. If you don't do this you will find the last line of your program missing.
 
-This version of SMON provides the "l" (load [Intel HEX](https://en.wikipedia.org/wiki/Intel_HEX)) command to 
-help test 6502 programs written on your PC and compiled there using a compiler such as VASM:
-  1. Tell your compiler to produce Intel HEX output (in VASM, use the "-Fihex" command line parameter).
-  2. In SMON, type "l" followed by ENTER on the command line
-  3. Copy-and-paste the content of the (plain text ASCII) .hex file produced by your compiler into the terminal.
-
-SMON will show a "+" for each HEX record processed. If a transmission error occurs, SMON shows
-a one-character error code followed by "?". Possible error codes are:
-  - I?: Input character error - an unexpected character was received in the input
-  - C?: Checksum error - the checksum at the end of a record did not match the expected value
-  - M?: Memory error - After writing a byte to memory it did not read back properly (most likely attempting to write to ROM)
-  - B?: Break - Either ESC or CTRL-C was received before the end of the transmission
-
-If no "?" is shown and SMON goes back to the command prompt then the transmission succeeded.
+To load a file the command is,
+.L"Filename" 
+for example
+.L"TEST" 
+this will load the program at the original address that was saved, if you would like to store it at a new address you would enter the following to load at address 5000 instead.
+.L"TEST" 5000 
 
 ### Memory size and test
 
@@ -225,48 +221,24 @@ There are three basic settings that can be changed by modifying the `config.asm`
         - Make sure the VIA's pin 21 (IRQ) is connected to the 6502 CPU's pin 4 (IRQ)
       The RX and TX pins can also be configured at the top of `uart_6522.asm`.
     - *Motorola MC6850*. If you choose this UART in the config.asm file you can configure it in the `uart_6850.asm` file,
-      most importantly the base address (default is $8100) and the serial parameters.
-    - *RP6502 RIA*. If you choose this UART_TYPE in config.asm, make sure to change the VIA address to the following  `VIA := $FFD0` in the same file.
-
+      most importantly the base address (default is $8100) and the serial parameters
 
 ## Compiling SMON 6502
 
-To produce a binary file that can be programmed into an EEPROM for the 6502 computer,
+To produce a binary file that can be used with the commodore 64 computer,
 do the following:
-  1. Download the `*.asm` files from this repository (there are only 7)
-  2. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
-  3. Extract `vasm6502_oldstyle.exe` from the archive and put it into the same directory as the .asm files
-  4. Issue the following command: `vasm6502_oldstyle.exe -dotdir -Fbin -o smon.bin smon.asm`
-
-Then just burn the generated smon.bin file to the EEPROM using whichever programmer
-you have been using.
-
-If you are using rumbledethumps [RP6502 Picocomputer](https://picocomputer.github.io), then I have included the sdk build environment that I used. I adapted the one provided by [Kai Wells](https://github.com/quells/wozmon.rp6502), that was used for his wozmon port.
-
- 1. Download the `*.asm` files from this repository (there are only 7)
-  2. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
-  3. Extract `vasm6502_oldstyle.exe` from the archive and put it into the same directory as the .asm files
-  4. Make sure you have installed python 3 and the pyserial module.
-
- ```
-$ pip install pyserial
-```
-
-  5. Finally, run `upload.py` to build and transfer the program to your Picocomputer by running the following command on the command line:
-
-```
-$ python3 upload.py
-```
  
-This will compile using [vasm](http://sun.hasenbraten.de/vasm/), write that out to a RP6502 ROM file, then attempt to upload to a Picocomputer attached via USB (you will need to modify the Device path of the Picocomputer serial connection in upload.py depending on your operating systems USB requirements).
+  1. Download the `*.asm` files from this repository and place into a directory named "src"
+  2. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
+  3. Extract `vasm6502_oldstyle.exe` from the archive and put it into the root directory that contains the src directory
+  4. Issue the following command: `python3 build.py`
 
-I have provided a cut down build.py that just compiles the source code and produces the new .rp6502 executable in the folder the command line is pointing to. To just build the program run the following:
+Then just import the generated smon.prg file to a .D64 floppy image using whichever program that supports your operating system that
+you have been using.
+I have been using ([DirMaster 3.1.5](https://style64.org/dirmaster)) for windows
 
-```
-$ python3 build.py
-```
-
-I can confirm that the above instructions worked on Windows 10 to compile the code and to transfer to the RP6502 Picocomputer by USB Flash Drive.
+I can confirm that the above instructions worked on Windows 10 to compile the code and to transfer to a floppy image that runs on VICE,
+and C64 computers that accept floppy images by USB Flash Drive. It should work on any C64 if you can transfer the smon.prg to your computer.
 
 ## Running Commodore 64 SMON
 
