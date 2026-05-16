@@ -68,7 +68,7 @@ Where "PC" is the program counter, "SR" is the status register, "AC" is the accu
 the X and Y registers and "SP" is the stack pointer. the "NV-BDIZC" column shows the individual bits
 in the status register.
 
-At the command prompt you can enter commands. For example, entering "m 1000 1030" will show the memory
+At the command prompt you can enter commands. For example, entering "M 1000 1030" will show the memory
 content from $1000-$1030:
 ```
 .M 1000 1030                                                                    
@@ -112,13 +112,17 @@ The "D" (disassemble) command will disassemble code in memory, for example:
 ,F013  60        RTS
 --------------------------------
 ```
+The istruction at F000 displayed is wrong as the real instruction starts at EFFE, starting at this
+address reveals the correct code. Be careful and check where the code really starts in memory.
+The code example actually starts at address EFDB.
+
 You can use the cursor keys to move over the displayed assembly statements and their arguments and modify 
 them (assuming the code is in RAM).
 
 You can use the "A" (assemble) command to assemble code directly into memory. SMON will show the current
 address as a prompt and you can enter an assembly statement (e.g. `LDX #12`). Press ENTER and SMON will
 assemble it, place it directly in memory, and advance the address to the next location according to the
-previous opcode's size. To exit assembly mode, type "f" as the opcode. SMON will then show you the full
+previous opcode's size. To exit assembly mode, type "F" as the opcode. SMON will then show you the full
 disassembly of the code you entered, in which you can edit again. For example:
 ```
 .A 2000                  
@@ -136,7 +140,7 @@ disassembly of the code you entered, in which you can edit again. For example:
 To run your code just enter `G 2000`. Note that to jump back into SMON after your code
 finishes, it should end with a `BRK` instruction.
 
-SMON also allows you to single-step through code using the `tw` (trace walk) command. For example:
+SMON also allows you to single-step through code using the `TW` (trace walk) command. For example:
 
 ```
 .R
@@ -156,11 +160,11 @@ SMON also allows you to single-step through code using the `tw` (trace walk) com
 ;2003 21 E9 03 FF FF  00100001
 ```
 
-After entering the `tw` command, SMON executes the first opcode and stops after
+After entering the `TW` command, SMON executes the first opcode and stops after
 finishing it and displays the next opcode (the first opcode is not shown).
 It also shows you the processor registers in the same order as they appear in the
 register display line. Press any key to advance one step or ESC to stop.
-If the next command is a `JSR`, press 'j' to "jump" over the subroutine and
+If the next command is a `JSR`, press 'J' to "jump" over the subroutine and
 continue after it finishes (this only works if the `JSR` command is located in RAM).
 
 SMON has a number of other "trace" related commands, a range of "find"
