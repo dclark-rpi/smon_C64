@@ -112,7 +112,7 @@ The "D" (disassemble) command will disassemble code in memory, for example:
 ,F013  60        RTS
 --------------------------------
 ```
-The istruction at F000 displayed is wrong as the real instruction starts at EFFE, starting at this
+The instruction at F000 displayed is wrong as the real instruction starts at EFFE, starting at this
 address reveals the correct code. Be careful and check where the code really starts in memory.
 The code example actually starts at address EFDB.
 
