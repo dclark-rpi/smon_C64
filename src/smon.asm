@@ -53,6 +53,7 @@ NUMCOLS     := $B2                            ; number of columns per row - scre
 NUMROWS     := $B3                            ; number of rows - screen height in hex
 BEFLEN      := $B6                            ; Instruction length for assembler/disassembler.
 KDBBUFNUM   := $C6                            ; number of characters currently in the keyboard buffer
+
 ;; $FB to $FE are used as commandline argument pointers for subroutines or user programs
 PCH         := $FB                            ; commandline argument 1 (high byte), big-endian
 PCL         := $FC                            ; commandline argument 1 (low byte),  big-endian
@@ -124,7 +125,7 @@ COLON       := $3A                            ; colon                 :
 SEMI        := $3B                            ; semicolon             ;
 QUEST       := $3F                            ; question mark         ?
 
-            .org    $8000                     ; on C64 gives 8k ram to store program
+            .org    $8000                     ; on C64 gives 8k ram to store SMON
 
 ;            jsr     RESET                     ; kernel reset vector, resets processor registers 
                                               ; and clears line buffer
@@ -196,7 +197,7 @@ CMDS:       .byte   <(TICK-1),>(TICK-1)             ; '
             .byte   <(GO-1),>(GO-1)                 ; G
             .byte   <(IOSET-1),>(IOSET-1)           ; I
             .byte   <(HELP-1),>(HELP-1)             ; H
-            .byte   <(KONTROLLE-1),>(KONTROLLE-1)   ; K
+            .byte   <(LISTASCII-1),>(LISTASCII-1)   ; K
             .byte   <(LOADSAVE-1),>(LOADSAVE-1)     ; L
             .byte   <(MEMDUMP-1),>(MEMDUMP-1)       ; M
             .byte   <(OCCUPY-1),>(OCCUPY-1)         ; O
@@ -756,7 +757,7 @@ LC98D:      lda     #$44                      ; "D"
             jsr     CHROUT                    ; output
             lda     #$C1                      ; "shifted A"
 LC994:      jsr     CHROUT                    ; output
-            ldy     #$00                      ;
+            ldy     #$00                      
             lda     (PCH),y                   ; high byte load from memory
             sty     $62                       ; prepare for Output Positive Integer
             sta     $63
@@ -848,7 +849,7 @@ MEM_ZERO:   lda     #$00                      ; set accumulator value to zero
         
 ;; put character into screen buffer at column Y
 ;; (make sure it is printable first)
-ASCII:      cmp     #$20                      ; check if charater byte is a space
+ASCII:      cmp     #$20                      ; check if character byte is a space
             bcc     ASCII_1                   ; if so, print "."
             cmp     #$60                      ; check if character byte is a grave accent
             bcc     ASCII_2                   ; output character to screen buffer
@@ -1029,7 +1030,7 @@ LC5A0:      lda     (PCH),y                   ; get data byte
             sbc     BEFLEN
             tax
             beq     SPCOC
-LC5B5:      jsr     TRPLSPACE                 ; output two space characters
+LC5B5:      jsr     TRPLSPACE                 ; output three space characters
             dex
             bne     LC5B5
 SPCOC:      jmp     ILOPCD                    ; output illegal opcode
@@ -1776,7 +1777,7 @@ LCAAE:      jsr     LC66A
             rts
 
 ;; LISTS ASCII CHARACTERS IN MEMORY (K)
-KONTROLLE:  jsr     GETADRSE
+LISTASCII:  jsr     GETADRSE
 LCABA:      ldx     #$27
             jsr     CHARRTN                   ; New line followed by a character from x
             jsr     HEXOUT                    ; output as 4 digit hex
@@ -1792,7 +1793,7 @@ LCAC9:      lda     (PCH,x)                   ; get next byte
             jmp     LCABA
 LCADA:      rts
 
-;; TICK (' - read ASCII chars to memory)
+;; TICK (') - read ASCII chars to memory)
 TICK:       jsr     GETADR                    ; get starting memory address
             ldy     #$03                      ; skip up to 3 spaces
 LCAE0:      jsr     CHRIN
@@ -1948,7 +1949,7 @@ MEMADR3      := $C000                         ; second program memory start addr
 MEMADR4      := $CFFF                         ; second program memory end address
 
 ;; Start testing first memory range from $0800 up to $7FFF
-MEMSIZE1:   ldy     #$00                      ; clear a temp page 0 byte to store high address
+MEMSIZE1:   ldy     #$01                      ; start high byte temp page at 1 byte to count first byte
             sty     $0100                     ; store zero byte into memory counter high byte temp page
             sty     $0101                     ; store zero byte into memory counter low byte temp page
 
@@ -2013,7 +2014,7 @@ NO_RAM1:    lda     #<MEMADR1                 ; start memory, high byte
             jsr     MSMESSAGE3                ; free bytes message
 
 ;; Start testing second memory range from $C000 up to $CFFF
-MEMSIZE2:   ldy     #$00                      ; clear a temp page 0 byte to store high address
+MEMSIZE2:   ldy     #$01                      ; start high byte temp page at 1 byte to count first byte
             sty     $0100                     ; store zero byte into memory counter high byte temp page
             sty     $0101                     ; store zero byte into memory counter low byte temp page
 
@@ -2411,7 +2412,7 @@ EXIT:       jsr     RETURN                    ; output ASCII carriage return (CR
 ;;; ---------------------------  C64 KERNAL routines   -------------------------
 ;;; ----------------------------------------------------------------------------
 
-LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $07E7
+LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $07FF
 INPUT_UCASE := 0                              ; do not automatically convert input to uppercase
 SUPPRESS_NP := 0                              ; do not suppress any characters on output
         
