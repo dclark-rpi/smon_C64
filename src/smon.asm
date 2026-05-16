@@ -1950,8 +1950,8 @@ MEMADR4      := $CFFF                         ; second program memory end addres
 
 ;; Start testing first memory range from $0800 up to $7FFF
 MEMSIZE1:   ldy     #$01                      ; start high byte temp page at 1 byte to count first byte
-            sty     $0100                     ; store zero byte into memory counter high byte temp page
-            sty     $0101                     ; store zero byte into memory counter low byte temp page
+            sty     $0100                     ; set memory counter high byte temp page
+            sty     $0101                     ; set memory counter low byte temp page
 
 
             lda     #<MEMADR1                 ; start memory page high byte
