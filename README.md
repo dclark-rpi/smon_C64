@@ -177,17 +177,27 @@ read the [64er article](https://archive.org/details/64er_sonderheft_1985_08/page
 ### Load / Save your program
 
 To save a file the command is,
+```
 .S"Filename" xxxx yyyy
+```
 for example
-.S"TEST" 4000 400A 
+```
+.S"TEST" 4000 400A
+```
 the filename is TEST and the program is stored in address 4000 to 4009, to correctly store the whole program you need to add one to the last address to be saved to disk. If you don't do this you will find the last line of your program missing.
 
 To load a file the command is,
-.L"Filename" 
+```
+.L"Filename"
+```
 for example
-.L"TEST" 
+```
+.L"TEST"
+```
 this will load the program at the original address that was saved, if you would like to store it at a new address you would enter the following to load at address 5000 instead.
-.L"TEST" 5000 
+```
+.L"TEST" 5000
+```
 
 ### Memory size and test
 
