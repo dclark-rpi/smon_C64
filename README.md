@@ -242,7 +242,8 @@ do the following:
   2. Download the `build.py` file from this repository and place into the root directory that contains the `src` directory
   3. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
   4. Extract `vasm6502_oldstyle.exe` from the archive and put it into the root directory that contains the src directory
-  5. Issue the following command: `python3 build.py`
+  5. If you don't already have python 3 installed then download and install python.
+  6. Issue the following command: `python3 build.py` on the commandline
 
 Then just import the generated smon.prg file to a .D64 floppy image using whichever program that supports your operating system that
 you have been using.
