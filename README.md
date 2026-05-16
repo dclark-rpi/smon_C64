@@ -238,14 +238,15 @@ There are three basic settings that can be changed by modifying the `config.asm`
 To produce a binary file that can be used with the commodore 64 computer,
 do the following:
  
-  1. Download the `*.asm` files from this repository and place into a directory named "src"
-  2. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
-  3. Extract `vasm6502_oldstyle.exe` from the archive and put it into the root directory that contains the src directory
-  4. Issue the following command: `python3 build.py`
+  1. Download the `*.asm` files from this repository and place into a directory named `src`
+  2. Download the `build.py` file from this repository and place into the root directory that contains the `src` directory
+  3. Download the VASM compiler ([vasm6502_oldstyle_Win64.zip](http://sun.hasenbraten.de/vasm/bin/rel/vasm6502_oldstyle_Win64.zip)).
+  4. Extract `vasm6502_oldstyle.exe` from the archive and put it into the root directory that contains the src directory
+  5. Issue the following command: `python3 build.py`
 
 Then just import the generated smon.prg file to a .D64 floppy image using whichever program that supports your operating system that
 you have been using.
-I have been using ([DirMaster 3.1.5](https://style64.org/dirmaster)) for windows
+I have been using ([DirMaster 3.1.5](https://style64.org/dirmaster)) for windows, to create and change the D64 floppy image
 
 I can confirm that the above instructions worked on Windows 10 to compile the code and to transfer to a floppy image that runs on VICE,
 and C64 computers that accept floppy images by USB Flash Drive. It should work on any C64 if you can transfer the smon.prg to your computer.
