@@ -1,11 +1,8 @@
 # SMON
 
-Modified to run on the Commodore 64 again
-
-Also the location of the jump table is labelled and used so as not to create a larger binary.
+Modified to run on the Commodore 64 again with a few adjustments made.
 
 The rest is pretty much the same....
-
 
 
 SMON is a machine language monitor and direct assembler for the Commodore 64,
@@ -31,17 +28,19 @@ I've included both an English and German transcript in plain text of the origina
 The version published here is an adaptation of SMON for a simple MOS6502-based 
 computer, such as the one built by [Ben Eater](https://eater.net/6502) in his 
 [YouTube video series](https://www.youtube.com/watch?v=LnzuMJLZRdU&list=PLowKtXNTBypFbtuVMUVXNR0z1mu7dp7eH).
-The following original SMON functions are **not** available in this version:
-  - Loading and saving programs/data to disk or tape (L/S/I commands)
+The following original or rp6502 SMON functions are **not** available in this version:
+  - load files in Intel HEX format into the 6502 by pasting them into the terminal (L command)
   - Sending output to a printer (P command)
-  - Producing BASIC DATA statements for memory content (B command)
   - Disk monitor mode and other extensions
   
 The following new commands have been added in this version
+  - B - Producing BASIC DATA statements for memory content
   - H - show a help screen with a brief overview of available commands
-  - L - load files in Intel HEX format into the 6502 by pasting them into the terminal
+  - L/S/I  - Loading and saving programs/data to disk or tape
   - MS - check and print size of installed memory
   - MT - test memory
+  - If you press the left arrow key (Top left key on commodore keyboard) and press return,
+    it will perform a hard reset of the computer, but won't delete anything located in program memory.
 
 ## Installing and running SMON 6502
 
@@ -69,13 +68,16 @@ Where "PC" is the program counter, "SR" is the status register, "AC" is the accu
 the X and Y registers and "SP" is the stack pointer. the "NV-BDIZC" column shows the individual bits
 in the status register.
 
-At the command prompt you can enter commands. For example, entering "m 1000 1020" will show the memory
-content from $1000-$1020:
+At the command prompt you can enter commands. For example, entering "m 1000 1030" will show the memory
+content from $1000-$1030:
 ```
-.m 1000 1030                                                                    
-:1000 00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F         ........ ........
-:1010 10 11 12 13 14 15 16 17  18 19 1A 1B 1C 1D 1E 1F         ........ ........
-:1020 20 21 22 23 24 25 26 27  28 29 2A 2B 2C 2D 2E 2F          !"#$%&' ()*+,-./
+.M 1000 1030                                                                    
+:1000 00 00 FF FF FF FF 00 00   ........
+:1008 00 00 FF FF FF FF 00 00   ........
+:1010 00 00 FF FF FF FF 00 00   ........
+:1018 00 00 FF FF FF FF 00 00   ........
+:1020 00 00 FF FF FF FF 00 00   ........
+:1028 00 00 FF FF FF FF 00 00   ........
 ```
 The column on the right shows the (printable) ASCII characters corresponding to the data bytes.
 
@@ -91,51 +93,57 @@ modify memory by typing (for example)
 ```
 and pressing ENTER. The example here will set $1015 to AA and $1016 to BB.
 
-If you supply only one argument to the "m" command, SMON will show the memory content line-by-line,
+If you supply only one argument to the "M" command, SMON will show the memory content line-by-line,
 stopping after each line. Press SPACE to advance to the next line, ESC to go back to the command prompt
 or any other key to keep displaying memory without pausing (press SPACE to pause the scrolling display).
 
-The "d" (disassemble) command will disassemble code in memory, for example:
+The "D" (disassemble) command will disassemble code in memory, for example:
 ```
-.d f000
-,F009  A9 FF     LDA #FF
-,F00B  A2 04     LDX #04
-,F00D  95 FA     STA   FA,X
-,F00F  CA        DEX
-,F010  D0 FB     BNE F00D
+.D F000
+  PC   MACHINE   OPC  ADR
+,F000  DD 09 02  CMP  0209,X
+,F003  8D 01 DD  STA  DD01
+,F006  2C 01 DD  BIT  DD01
+,F009  70 07     BVS  F012
+,F00B  30 F9     BMI  F006
+,F00D  A9 40     LDA  #40
+,F00F  8D 97 02  STA  0297
+,F012  18        CLC
+,F013  60        RTS
+--------------------------------
 ```
 You can use the cursor keys to move over the displayed assembly statements and their arguments and modify 
 them (assuming the code is in RAM).
 
-You can use the "a" (assemble) command to assemble code directly into memory. SMON will show the current
+You can use the "A" (assemble) command to assemble code directly into memory. SMON will show the current
 address as a prompt and you can enter an assembly statement (e.g. `LDX #12`). Press ENTER and SMON will
 assemble it, place it directly in memory, and advance the address to the next location according to the
 previous opcode's size. To exit assembly mode, type "f" as the opcode. SMON will then show you the full
 disassembly of the code you entered, in which you can edit again. For example:
 ```
-.a 2000                  
- 2000  ldx #00 
- 2002  inx     
- 2003  bne 2002
- 2005  brk     
- 2006 f                  
+.A 2000                  
+ 2000 LDX #00 
+ 2002 INX     
+ 2003 BNE 2002
+ 2005 BRK     
+ 2006 F                  
 ,2000  A2 00     LDX #00 
 ,2002  E8        INX     
 ,2003  D0 FD     BNE 2002
 ,2005  00        BRK     
 ```
 
-To run your code just enter `g 2000`. Note that to jump back into SMON after your code
+To run your code just enter `G 2000`. Note that to jump back into SMON after your code
 finishes, it should end with a `BRK` instruction.
 
 SMON also allows you to single-step through code using the `tw` (trace walk) command. For example:
 
 ```
-.r
+.R
 
   PC  SR AC XR YR SP  NV-BDIZC
-;E00E B4 E9 00 FF FF  10110100
-.tw 2000
+;800B B0 89 00 00 F6  10110000
+.TW 2000
                       
  2002 23 E9 00 FF FF  00100011   INX     
  2003 21 E9 01 FF FF  00100001   BNE 2002
