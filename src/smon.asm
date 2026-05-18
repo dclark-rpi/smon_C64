@@ -992,7 +992,7 @@ LC55C:      rts
 DISASS:     ldx     #$00
             stx     BINARYNUM
             jsr     GETADRSE                  ; get start (FB/FC) and end address (FD/FE)
-            jsr     DBGHEADER                 ; outputs disassembler header on first line
+DISASSEM:   jsr     DBGHEADER                 ; outputs disassembler header on first line
             jsr     TWHEADER                  ; outputs disassembler header on first line
 LC564:      jsr     LC58C
             lda     BEFCODE
@@ -1243,7 +1243,7 @@ LC729:      lda     $FA,x                     ; swap $FB/$FC and $FD/$FE
             sta     PCL,x
             dex
             bne     LC729
-            jmp     LC564                     ; disassemble
+            jmp     DISASSEM                  ; disassemble
 LC739:      cmp     #PERIOD                   ; is character byte a "."
             bne     LC74E                     ; jump if not
             jsr     GETBYT1
