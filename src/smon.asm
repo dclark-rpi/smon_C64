@@ -31,104 +31,125 @@
 ;;; https://github.com/cbmuser/smon-reassembly
 ;;; https://github.com/LeshanDaFo/SMON-RelocatableSourceCode
 
- .include "config.asm"        
+;; program variables
+LINEBUF      := $0400                         ; line ("screen") buffer memory $0400 to $07FF
+CIA_TIMING   := $49                           ; this is the timing value for the CIA 
+                                              ; new CIA use $49, old CIA use $47   - only use one  
+      
+;;; C64 KERNAL zero page addresses
 
+TERMCOL     := $90           ; cursor column on terminal
+STOPFLAG    := $91           ; flag for "STOP" key pressed
+LASTRECV    := $93           ; previous received char
+ROWLIMIT    := $9C           ; number of rows currently in buffer
+TMPBUF      := $9E           ; temporary storage
+LASTCOL     := $C8           ; last cursor column for input
+ESCFLAG     := $D0           ; ESC sequence flag (shared with CRFLAG)
+CRFLAG      := $D0           ; <>0 => there is input ready to read
+LINEPTR     := $D1           ; pointer to screen buffer for current line
+CSRCOL      := $D3           ; current cursor column
+CSRROW      := $D6           ; current cursor row
+LASTPRNT    := $D7           ; last character printed to screen
+                                              
 ;; zero-page addresses
 ;; addresses $A0 to $A2 are used by the C64 Kernal for clock function
 
-DIGIT       := $A4                            ; stores number of decimal digits to printout
-PAD         := $A5                            ; stores decimal conversion padding ASCII character        
-HEXLB       := $A6                            ; hex low byte for number conversion,  little-endian
-HEXHB       := $A7                            ; hex high byte for number conversion, little-endian
+DIGIT        := $A4                           ; stores number of decimal digits to printout
+PAD          := $A5                           ; stores decimal conversion padding ASCII character        
+HEXLB        := $A6                           ; hex low byte for number conversion,  little-endian
+HEXHB        := $A7                           ; hex high byte for number conversion, little-endian
 ;; above zero page addresses shares ADRBUF allocation.
-ADRBUF      := $A4                            ; Address buffer $A4 to $A9 (3 memory locations)
-BINARYNUM   := $AA                            ; store hex number to convert into binary
-ADRCODE     := $AB                            ; Addressing code for assembler/disassembler
-COMMAND     := $AC                            ; SMON instruction code
-BEFCODE     := $AD                            ; Instruction code for assembler/disassembler.
-LOPER       := $AE                            ; Low operand for assembler/disassembler.
-HOPER       := $AF                            ; High operand for assembler/disassembler.
-NUMCMDS     := $B1                            ; Hex number of SMON commands in table
-NUMCOLS     := $B2                            ; number of columns per row - screen width in hex
-NUMROWS     := $B3                            ; number of rows - screen height in hex
-BEFLEN      := $B6                            ; Instruction length for assembler/disassembler.
-KDBBUFNUM   := $C6                            ; number of characters currently in the keyboard buffer
-
+ADRBUF       := $A4                           ; Address buffer $A4 to $A9 (3 memory locations)
+BINARYNUM    := $AA                           ; store hex number to convert into binary
+ADRCODE      := $AB                           ; Addressing code for assembler/disassembler
+COMMAND      := $AC                           ; SMON instruction code
+BEFCODE      := $AD                           ; Instruction code for assembler/disassembler.
+LOPER        := $AE                           ; Low operand for assembler/disassembler.
+HOPER        := $AF                           ; High operand for assembler/disassembler.
+NUMCMDS      := $B1                           ; Hex number of SMON commands in table
+NUMCOLS      := $B2                           ; number of columns per row - screen width in hex
+NUMROWS      := $B3                           ; number of rows - screen height in hex
+BEFLEN       := $B6                           ; Instruction length for assembler/disassembler.
+KDBBUFNUM    := $C6                           ; number of characters currently in the keyboard buffer
 ;; $FB to $FE are used as commandline argument pointers for subroutines or user programs
-PCH         := $FB                            ; commandline argument 1 (high byte), big-endian
-PCL         := $FC                            ; commandline argument 1 (low byte),  big-endian
-ECH         := $FD                            ; commandline argument 2 (high byte), big-endian
-ECL         := $FE                            ; commandline argument 2 (low byte),  big-endian
+PCH          := $FB                           ; commandline argument 1 (high byte), big-endian
+PCL          := $FC                           ; commandline argument 1 (low byte),  big-endian
+ECH          := $FD                           ; commandline argument 2 (high byte), big-endian
+ECL          := $FE                           ; commandline argument 2 (low byte),  big-endian
 
 ;; Outside the zero page, SMON uses the following areas:
 
 ;; KERNAL variables (0200-03FF)
-KDBBUFINDEX := $0276                          ; index or position in keyboard buffer pointer
-KBDBUF      := $0277                          ; buffer for keyboard commands from $0277 to $0280
-COLOUR      := $0286                          ; character colour
+KDBBUFINDEX  := $0276                         ; index or position in keyboard buffer pointer
+KBDBUF       := $0277                         ; buffer for keyboard commands from $0277 to $0280
+COLOUR       := $0286                         ; character colour
 
 ;; Processor registers:
-PCLSAVE     := $02A8                          ; Program Counter (low byte),  little-endian
-PCHSAVE     := $02A9                          ; Program Counter (high byte), little-endian
-SRSAVE      := $02AA                          ; Processor Status Flag Register
-AKSAVE      := $02AB                          ; Accumulator
-XRSAVE      := $02AC                          ; Index Register X
-YRSAVE      := $02AD                          ; Index Register Y
-SPSAVE      := $02AE                          ; Stack Pointer
+PCLSAVE      := $02A8                         ; Program Counter (low byte), little-endian
+PCHSAVE      := $02A9                         ; Program Counter (high byte), little-endian
+SRSAVE       := $02AA                         ; Processor Status Flag Register
+AKSAVE       := $02AB                         ; Accumulator
+XRSAVE       := $02AC                         ; Index Register X
+YRSAVE       := $02AD                         ; Index Register Y
+SPSAVE       := $02AE                         ; Stack Pointer
 
-IONO        := $02B0                          ; Device-Number
-MEM         := $02B1                          ; Buffer from $02B1 to $02B7
-TRACEBUF    := $02B8                          ; Buffer for trace mode from $02B8 to $02BF   
+IONO         := $02B0                         ; Device-Number
+MEM          := $02B1                         ; Buffer from $02B1 to $02B7
+TRACEBUF     := $02B8                         ; Buffer for trace mode from $02B8 to $02BF   
 
-IRQ_LO      := $0314                          ; Vector: Hardware IRQ Interrupt Address Lo
-IRQ_HI      := $0315                          ; Vector: Hardware IRQ Interrupt Address Hi
-BRK_LO      := $0316                          ; Vector: BRK Lo
-BRK_HI      := $0317                          ; Vector: BRK Hi
-LOADVECT    := $0330                          ; Vector: Kernel LOAD
-SAVEVECT    := $0332                          ; Vector: Kernel SAVE
+IRQ_LO       := $0314                         ; Vector: Hardware IRQ Interrupt Address Lo
+IRQ_HI       := $0315                         ; Vector: Hardware IRQ Interrupt Address Hi
+BRK_LO       := $0316                         ; Vector: BRK Lo
+BRK_HI       := $0317                         ; Vector: BRK Hi
+LOADVECT     := $0330                         ; Vector: Kernel LOAD
+SAVEVECT     := $0332                         ; Vector: Kernel SAVE
 
-SOFTRESET   := $A474                          ; Exit to BASIC
+SOFTRESET    := $A474                         ; Exit to BASIC
 
-INTOUT      := $BDCD                          ; Output Positive Integer in A/X
-INTOUT1     := $BDD1                          ; Output Positive Integer in A/X
+INTOUT       := $BDCD                         ; Output Positive Integer in A/X
+INTOUT1      := $BDD1                         ; Output Positive Integer in A/X
 
-TEXTMODE    := $D018                          ; commodore 64 - switch character sets between 
+VIC_CTRL1    := $D011                         ; VIC Control Register 1
+TEXTMODE     := $D018                         ; commodore 64 - switch character sets between 
                                               ; lowercase mode - $17 or default mode - $15
-RESET       := $FCE2                          ; cold start routine
+TIMERA_LO    := $DC04                         ; Timer A Low-Byte (Kernal-IRQ, Tape)
+TIMERA_HI    := $DC05                         ; Timer A High-Byte (Kernal-IRQ, Tape)
+CONTROL_REGA := $DC0E                         ; Control Register A CIA #1
+RESET        := $FCE2                         ; cold start routine
+EN_TIMER     := $FDDD                         ; Enable Timer
+MEMTOP       := $FE25                         ; top of memory pointer
+MEMBOT       := $FE34                         ; bottom of memory pointer
 
 ;; Kernal Jump Table
-JMPTABLE    := $FF81                          ; Kernal routine start address
-CHRIN       := JMPTABLE+$4E     ; $FFCF       ; Kernal input routine
-CHROUT      := JMPTABLE+$51     ; $FFD2       ; Kernal output routine
-STOPKEY     := JMPTABLE+$60     ; $FFE1       ; Kernal test STOP routine
-GETIN       := JMPTABLE+$63     ; $FFE4       ; Kernal get input routine
-SCREEN      := JMPTABLE+$6C     ; $FFED       ; Kernal gets size of screen display
+JMPTABLE     := $FF81                         ; Kernal routine start address
+CHRIN        := JMPTABLE+$4E     ; $FFCF      ; Kernal input routine
+CHROUT       := JMPTABLE+$51     ; $FFD2      ; Kernal output routine
+STOPKEY      := JMPTABLE+$60     ; $FFE1      ; Kernal test STOP routine
+GETIN        := JMPTABLE+$63     ; $FFE4      ; Kernal get input routine
+SCREEN       := JMPTABLE+$6C     ; $FFED      ; Kernal gets size of screen display
 
 ;; ASCII-Table control codes and characters
-CR          := $0D                            ; carriage return
-SP          := $20                            ; space
-EXCL        := $21                            ; exclamation mark      !
-QUOT        := $22                            ; double quotes         "
-NUM         := $23                            ; number sign or hash   #
-DOLLAR      := $24                            ; dollar                $
-APOS        := $27                            ; single quote or tick  '
-LPAREN      := $28                            ; open bracket          (
-RPAREN      := $29                            ; close bracket         )
-AST         := $2A                            ; asterisk              *
-PLUS        := $2B                            ; plus                  +
-COMMA       := $2C                            ; comma                 ,
-MINUS       := $2D                            ; minus or hyphen       -
-PERIOD      := $2E                            ; period or dot         .
-ZERO        := $30                            ; zero                  0
-ONE         := $31                            ; one                   1
-COLON       := $3A                            ; colon                 :
-SEMI        := $3B                            ; semicolon             ;
-QUEST       := $3F                            ; question mark         ?
+CR           := $0D                           ; carriage return
+SP           := $20                           ; space
+EXCL         := $21                           ; exclamation mark      !
+QUOT         := $22                           ; double quotes         "
+NUM          := $23                           ; number sign or hash   #
+DOLLAR       := $24                           ; dollar                $
+APOS         := $27                           ; single quote or tick  '
+LPAREN       := $28                           ; open bracket          (
+RPAREN       := $29                           ; close bracket         )
+AST          := $2A                           ; asterisk              *
+PLUS         := $2B                           ; plus                  +
+COMMA        := $2C                           ; comma                 ,
+MINUS        := $2D                           ; minus or hyphen       -
+PERIOD       := $2E                           ; period or dot         .
+ZERO         := $30                           ; zero                  0
+ONE          := $31                           ; one                   1
+COLON        := $3A                           ; colon                 :
+SEMI         := $3B                           ; semicolon             ;
+QUEST        := $3F                           ; question mark         ?
 
             .org    $8000                     ; on C64 gives 8k ram to store SMON
-
-;            jsr     RESET                     ; kernel reset vector, resets processor registers 
-                                              ; and clears line buffer
 
 ENTRY:      lda     #<BREAK                   ; set break-vector to program start
             sta     BRK_LO
@@ -156,12 +177,10 @@ HLPMSG:     .byte   "A xxxx - Assemble starting at x (end assembly with 'f', use
             .byte   "O xxxx yyyy (aa) - Fill memory xxxx yyyy with aa (omit aa to zero erase)",0
             .byte   "R - Display Processor Registers",0
             .byte   "S\"Filename\" xxxx yyyy - Save from xxxx to yyyy on floppy or tape",0
-            .if     VIA > 0
-              .byte   "TW xxxx - Trace walk (single step)",0
-              .byte   "TB xxxx nn - Trace break (set break point at x, stop when hit n times)",0
-              .byte   "TQ xxxx - Trace quick (run to break point)",0
-              .byte   "TS xxxx - Trace stop (run to xxxx)",0
-            .endif
+            .byte   "TW xxxx - Trace walk (single step)",0
+            .byte   "TB xxxx nn - Trace break (set break point at x, stop when hit n times)",0
+            .byte   "TQ xxxx - Trace quick (run to break point)",0
+            .byte   "TS xxxx - Trace stop (run to xxxx)",0
             .byte   "V xxxx yyyy zzzz aaaa bbbb - Within a-b, convert addresses referencing x-y to z",0
             .byte   "W xxxx yyyy zzzz - Copy memory xxxx yyyy to z",0
             .byte   "X - Exit SMON",0
@@ -210,7 +229,6 @@ CMDS:       .byte   <(TICK-1),>(TICK-1)             ; '
 
 ;; output line start characters
 CMDTAB:     .byte   "':;,()!"
-            .byte   <(ILOPC-1),>(ILOPC-1)           ; activate the illegal opcodes
             .byte   $00,$00
             .byte   $00,$00,$00
         
@@ -238,9 +256,9 @@ MSMSG1:     .byte   $20,"MEMORY SIZE",$00
 MSMSG2:     .byte   $20,"-",$20,$00
 MSMSG3:     .byte   $20,"BYTES FREE",$00
 MSMSG4:     .byte   $20,$20,$20,$20,$20,$20,$20,"TOTAL",$00
-REGHDR:     .byte   $0D,$0D,$20,$20,"PC  SR AC XR YR SP  NV-BDIZC",$00
-DEBUGHDR:   .byte   $0D,$0D,$20,$20,"PC   MACHINE",$00
-TRACEHDR:   .byte   $20,$20,$20,$20,"OPC  ADR",$00
+REGHDR:     .byte   $0D,$0D,$20,$20,"PC  SR AC XR YR SP NV-BDIZC",$00
+DEBUGHDR:   .byte   $0D,$0D,$20,$20,"PC   MACHINE",$20,$00
+TRACEHDR:   .byte   $20,$20,$20,"OPC  ADR",$00
 LC0AC:      .byte   $00,$02,$04
 LC0AF:      .byte   $01,$2C,$00
 LC0B2:      .byte   $2C,$59,$29
@@ -654,11 +672,10 @@ TRACEREG:   lda     PCHSAVE                   ; load program counter (high byte)
             sta     PCH                       ; restore program counter (high byte)
             stx     PCL                       ; restore program counter (low byte)
             jsr     HEXOUT                    ; output ASCII string as 4 digit hex
-            jsr     SPACE                     ; output SPACE character
             ldx     #PCH                      ; load program counter (high byte) as counter for next op
-REGISTER1:  lda     $01AF,x
+REGISTER1:  jsr     SPACE                     ; output SPACE character
+            lda     $01AF,x
             jsr     HEXOUT1                   ; output ASCII string as 2 digit hex
-            jsr     SPACE                     ; output SPACE character
             inx
             bne     REGISTER1                 ; loop until X = 0
             lda     SRSAVE                    ; load processor status flag register into accumulator
@@ -1011,7 +1028,8 @@ LC580:      jsr     CHROUT                    ; output a minus character "-"
             bne     LC580
 LC586:      jsr     CHECKEND
             bcc     LC564
-            rts      
+            rts 
+     
 LC58C:      ldx     #COMMA                    ; output NEWLINE followed by ","
             jsr     CHARRTN                   ; New line followed by a character from x
             jsr     HEXOUT                    ; output FB/FC (address)
@@ -1896,7 +1914,7 @@ LCB96:      lda     BEFCODE,y
             dey
             bne     LCB96
 LCBA1:      sty     BINARYNUM
-            jsr     LC58C                     ; disassemble one opcode at current addres
+            jsr     LC58C                     ; disassemble one opcode at current address
             jsr     KBDKEY                    ; handle PAUSE/STOP
 LCBA9:      jsr     CMPEND1                   ; check whether end address has been reached
             bcc     LCB7F                     ; repeat if not
@@ -2144,10 +2162,7 @@ MTL7:       tya
             rts
         
 ;; TRACE (T)
-TRACE:      .if     VIA == 0
-              jmp     ERROR                   ; can only do trace if we have a VIA
-            .endif
-            pla
+TRACE:      pla
             pla
             jsr     CHRIN
             jsr     UCASE
@@ -2206,6 +2221,9 @@ LCC38:      pla
             lda     #$52
             jmp     CMDSTORE
 LCC65:      jsr     RETURN                    ; output ASCII carriage return (CR)
+LCC66:      lda     VIC_CTRL1
+            ora     #$10
+            sta     VIC_CTRL1
             rts
 RTSCMD:     sta     AKSAVE                    ; store accumulator value
             php
@@ -2227,18 +2245,9 @@ RTSCMD:     sta     AKSAVE                    ; store accumulator value
 
 ;; entry point from TW after an instruction has been executed
 ;; (via timer interrupt)
-TWINT:      lda     #$40                      ; clear VIA timer 1 interrupt flag
-            sta     VIA_IFR
-            jsr     LCDE5                     ; restore IRQ vector
+TWINT:      jsr     LCDE5                     ; restore IRQ vector
+            jsr     EN_TIMER
             cld                               ; make sure "decimal" flag is not set
-            .if UART_TYPE==6522               ; if VIA is also used as UART
-              lda     #$40                    ; set T1 free run, T2 clock ?2
-              sta     VIA_CR                  ; set VIA 1 ACR
-              lda     #$40                    ; disable VIA timer 1 interrupt
-	      sta     VIA_IER                 ; set VIA 1 IER
-              lda     #$90                    ; enable VIA CB1 interrupt
-	      sta     VIA_IER                 ; set VIA 1 IER
-            .endif
             ldx     #$05                      ; get registers from stack
 LCC9E:      pla                               ; (were put there when IRQ happened)
             sta     PCLSAVE,x                 ; store them in PCLSAVE memory location x
@@ -2254,7 +2263,8 @@ LCCA5:      lda     IRQ_LO                    ; save IRQ pointer
             lda     SRSAVE                    ; load processor status flag register into accumulator
             and     #$10
             beq     LCCC5
-LCCBD:      lda     #'R'
+LCCBD:      jsr     LCC65
+            lda     #'R'
             jmp     CMDSTORE
 LCCC5:      bit     TRACEBUF+4                ; $02BC trace buffer memory address
             bvc     LCCE9
@@ -2280,7 +2290,8 @@ LCCE9:      bmi     LCCFD
             lda     #<RTSCMD
             pha
             jmp     LCDBA
-LCCFD:      lda     #ADRBUF+4                 ; load address buffer $A8 into accumulator
+LCCFD:      jsr     LCC66
+            lda     #ADRBUF+4                 ; load address buffer $A8 into accumulator
             sta     PCH                       ; store accumulator into program counter (high byte)
             lda     #$02
             sta     PCL
@@ -2299,10 +2310,9 @@ LCD20:      lda     PCHSAVE                   ; restore program counter (high by
             ldx     PCLSAVE                   ; restore program counter (low byte) into X register
             sta     PCH                       ; set program counter to current address (high byte)
             stx     PCL                       ; set program counter to current address (low byte)
-            jsr     SPACE                     ; output a SPACE character
             lda     SRSAVE                    ; load processor status flag register into accumulator
             jsr     BIN8BIT                   ; display processor flag as 8-bit binary string
-            jsr     DBLSPACE                  ; output two SPACE characters
+            jsr     SPACE                     ; output one SPACE character
             jsr     LC4CB                     ; disassemble 6502 opcodes
             jsr     ILOPCD                    ; disassemble 6502 illegal opcodes
             jsr     LCC65                     ; output carriage return 
@@ -2336,32 +2346,39 @@ LCD60:      sta     TRACEBUF+4                ; $02BC trace buffer memory addres
             jsr     GETSTART
             jsr     REGHEADER                 ; output processor header string to display
             jsr     TWHEADER                  ; trace disassembled header string to display
-            jsr     LCC65
+            jsr     LCC66                     ; output trace disassembled code
             lda     TRACEBUF+4                ; $02BC trace buffer memory address
             beq     LCDA9
-LCD72:      .if UART_TYPE==6522               ; if VIA is also used as UART
-              lda     VIA_IER                 ; get enabled VIA interrupts
-              and     #$60                    ; isolate T1 and T2 interrupts
-              bne     LCD72                   ; wait until both disabled (UART is idle)
-            .endif
-            sei
-            lda     #$7F
-            sta     VIA_IER                   ; disable all VIA interrupts
-            lda     #$C0
-            sta     VIA_IER                   ; enable VIA timer 1 interrupt
-            lda     #$00
-            sta     VIA_CR                    ; VIA timer 1 single-shot mode
-            ldx     #0
-            lda     #73                       ; 73 cycles until timer expires
-            sta     VIA_T1LL                  ; set VIA timer 1 low-order latch 
-            stx     VIA_T1CH                  ; set VIA timer 1 high-order counter (start timer)
+LCD72:      ldx     #$00
+            lda     VIC_CTRL1
+            tay
+            and     #$10
+            beq     LCD8C
+            tya
+            and     #$EF
+            sta     VIC_CTRL1
+            nop
+            nop
+            ldy     #$0C
+LCD86:      dex
+            bne     LCD86
+            dey
+            bne     LCD86
+LCD8C:      sei
+            lda     #CIA_TIMING               ; this is the timing value for the CIA
+            sta     TIMERA_LO
+            stx     TIMERA_HI
+            lda     CONTROL_REGA
+            and     #$80
+            ora     #$11
+            sta     CONTROL_REGA              
             lda     #<TWINT                   ; (2)
-            ldx     #>TWINT                   ; (2)
+LCDA1:      ldx     #>TWINT                   ; (2)
             sta     TRACEBUF+3                ; (4) $02BB trace buffer memory address
             stx     TRACEBUF+2                ; (4) $02BA trace buffer memory address
 LCDA9:      ldx     SPSAVE                    ; (4) load stack pointer into X register
             txs                               ; (2)
-            cli                               ; (2)
+            sei                               ; (2)
             lda     TRACEBUF+3                ; (4) $02BB trace buffer memory address
             ldx     TRACEBUF+2                ; (4) $02BA trace buffer memory address
             sta     IRQ_LO                    ; (4)
@@ -2407,54 +2424,3 @@ LCDF2:      lda     IRQ_LO
 ;; EXIT SMON (X)        
 EXIT:       jsr     RETURN                    ; output ASCII carriage return (CR)
             jmp     SOFTRESET                 ; exit to BASIC or return to SMON if no underlying
-
-;;; ----------------------------------------------------------------------------
-;;; ---------------------------  C64 KERNAL routines   -------------------------
-;;; ----------------------------------------------------------------------------
-
-LINEBUF     := $0400                          ; line ("screen") buffer memory $0400 to $07FF
-INPUT_UCASE := 0                              ; do not automatically convert input to uppercase
-SUPPRESS_NP := 0                              ; do not suppress any characters on output
-        
-;;; ----------------------------------------------------------------------------
-;;; ----------------------  C64 KERNAL zero page address   ---------------------
-;;; ----------------------------------------------------------------------------
-
-TERMCOL     := $90           ; cursor column on terminal
-STOPFLAG    := $91           ; flag for "STOP" key pressed
-LASTRECV    := $93           ; previous received char
-ROWLIMIT    := $9C           ; number of rows currently in buffer
-TMPBUF      := $9E           ; temporary storage
-LASTCOL     := $C8           ; last cursor column for input
-ESCFLAG     := $D0           ; ESC sequence flag (shared with CRFLAG)
-CRFLAG      := $D0           ; <>0 => there is input ready to read
-LINEPTR     := $D1           ; pointer to screen buffer for current line
-CSRCOL      := $D3           ; current cursor column
-CSRROW      := $D6           ; current cursor row
-LASTPRNT    := $D7           ; last character printed to screen
-
-;;; ----------------------------------------------------------------------------
-;;; ---------------------- UART communication functions  -----------------------
-;;; ----------------------------------------------------------------------------
-
-            .if UART_TYPE==6522
-             .include "uart_6522.asm"
-            .else 
-             .if UART_TYPE==6551
-              .include "uart_6551.asm"
-             .else
-              .if UART_TYPE==6850
-               .include "uart_6850.asm"
-              .else
-               .if UART_TYPE==6502
-                .include "rp6502_ria.asm"
-               .else
-                .if UART_TYPE==0000
-                 .include "uart_stub.asm"
-                .else
-                .err "invalid UART_TYPE"
-                .endif
-               .endif
-              .endif
-             .endif
-            .endif
