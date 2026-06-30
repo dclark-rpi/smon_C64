@@ -1,0 +1,47 @@
+I found this example on Kevin's Blog at 
+https://emalliab.wordpress.com/2026/01/02/rp6502-the-picocomputer/
+it is based on Rumbledethumps example on his youtube channel. The article can be read
+at the address above.
+I've found that Kevin's example doesn't end gracefully and requires a ctrl + alt + del
+key combination to return to the commandline. but it does work on current firmware's.
+
+I've fixed that problem in the assembler source below and I also added in a new byte
+sequence to make sure it works nicely with smon.
+
+You can type in the object code directly into the RP6502 Picocomputer commandline ']'
+after typing the code you need to set the program to run which is the FFFC 00 02 command.
+Now all you have to do is type RESET to execute the code, until your fed up. 
+It will always return you to the commandline prompt ']'
+
+You can type the object code into smon you just change the ']' to a ':' which you do type
+along with the code, but don't bother with the FFFC 00 02 or the reset commands.
+You just type G 0200 and press return to execute the code.
+
+
+Assembler Source:
+
+* = $0200
+ldx #0
+loop:
+lda text,x
+sta $ffe1
+inx
+cmp #0
+bne loop
+lda #$ff
+sta $ffef
+
+text:
+.BYTE $0D $0A
+.ASCII "Hello, World!"
+.BYTE $0D $0A $00
+
+Object Code:
+
+]0200 A2 00 BD 12 02 8D E1 FF
+]0208 E8 C9 00 D0 F5 A9 FF 8D
+]0210 EF FF 0D 0A 48 65 6C 6C
+]0218 6F 2C 20 57 6F 72 6C 64
+]0220 21 0D 0A 00
+]FFFC 00 02
+]RESET
